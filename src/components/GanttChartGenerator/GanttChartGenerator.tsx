@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Calendar, Download, Plus, Trash2, Upload } from 'lucide-react';
 import { Task, DragState } from '../../types';
-import '../GanttChart.css';
+import '../GanttNew.css';
 
 const GanttChartGenerator: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([
@@ -54,27 +54,66 @@ const GanttChartGenerator: React.FC = () => {
     originalTaskState: null
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const tgcInputRef = useRef<HTMLInputElement>(null);
+  // Save project as .tgc file
+  const saveProjectAsTGC = () => {
+    const data = JSON.stringify({ tasks });
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'project.tgc';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
+  // Open project from .tgc file
+  const handleTGCFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string);
+        if (json.tasks && Array.isArray(json.tasks)) {
+          setTasks(json.tasks);
+        }
+      } catch (err) {
+        alert('Invalid .tgc file format');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Color classes for task bars (rotate colors like legend)
+  const taskColors = ['task-blue', 'task-teal', 'task-green', 'task-yellow', 'task-red'];
+
+  // Agile-style header data: Q1 (Jan-Mar), Q2 (Apr-Jul)
   const months = [
-    { name: 'Jan', quarter: 1, month: 1 },
-    { name: 'Feb', quarter: 1, month: 2 },
-    { name: 'Mar', quarter: 1, month: 3 },
-    { name: 'Apr', quarter: 2, month: 4 },
-    { name: 'May', quarter: 2, month: 5 },
-    { name: 'Jun', quarter: 2, month: 6 },
-    { name: 'Jul', quarter: 3, month: 7 },
-    { name: 'Aug', quarter: 3, month: 8 },
-    { name: 'Sep', quarter: 3, month: 9 },
-    { name: 'Oct', quarter: 3, month: 10 },
-    { name: 'Nov', quarter: 3, month: 11 },
-    { name: 'Dec', quarter: 3, month: 12 }
+    { key: 'JANUARY', short: 'JAN', days: 31, color: '#2b78e4', band: '#eaf3ff' },
+    { key: 'FEBRUARY', short: 'FEB', days: 28, color: '#2b78e4', band: '#e9f6ff' },
+    { key: 'MARCH', short: 'MAR', days: 31, color: '#18b0d6', band: '#e6f7fb' },
+    { key: 'APRIL', short: 'APR', days: 30, color: '#a758c9', band: '#f3e9fb' },
+    { key: 'MAY', short: 'MAY', days: 31, color: '#a758c9', band: '#f5e9f7' },
+    { key: 'JUNE', short: 'JUN', days: 30, color: '#b46cc9', band: '#f4ecfb' },
+    { key: 'JULY', short: 'JUL', days: 31, color: '#ff2f6d', band: '#ffe6ee' }
   ];
 
-  const quarters = [
-    { name: 'QUARTER 1', months: ['Jan', 'Feb', 'Mar'] },
-    { name: 'QUARTER 2', months: ['Apr', 'May', 'Jun'] },
-    { name: 'QUARTER 3', months: ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'] }
-  ];
+  const q1Days = months[0].days + months[1].days + months[2].days;
+  const q2Days = months[3].days + months[4].days + months[5].days + months[6].days;
+
+  // Timeline range (Jan 1 - Jul 31, 2025)
+  const rangeStart = new Date(2025, 0, 1);
+  const rangeEnd = new Date(2025, 6, 31);
+  const totalRangeDays = Math.round((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  const dayColumns = React.useMemo(() => {
+    const cols: { day: number; monthIndex: number }[] = [];
+    months.forEach((m, mi) => {
+      for (let d = 1; d <= m.days; d++) cols.push({ day: d, monthIndex: mi });
+    });
+    return cols;
+  }, []);
 
   // Helper function to convert DD/MM/YYYY to Date object
   const parseDate = (dateStr: string): Date | null => {
@@ -133,19 +172,24 @@ const GanttChartGenerator: React.FC = () => {
     const end = parseDate(endDate);
     
     if (!start || !end) return null;
-    
-    // Calculate position based on days from January 1, 2025
-    const yearStart = new Date(2025, 0, 1);
-    const yearEnd = new Date(2025, 11, 31);
-    
-    const totalDays = (yearEnd.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
-    const startDays = (start.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24);
-    const endDays = (end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
-    const duration = endDays - startDays;
+
+    // Clamp to visible range
+    const clampedStart = new Date(Math.max(start.getTime(), rangeStart.getTime()));
+    const clampedEnd = new Date(Math.min(end.getTime(), rangeEnd.getTime()));
+    if (clampedEnd < rangeStart || clampedStart > rangeEnd) return null; // outside range
+
+    const leftDays = (clampedStart.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24);
+    const rightDays = (clampedEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
+    const duration = rightDays - leftDays;
+
+    // Calculate position based on the first cell's position - 
+    // the bar will be positioned absolutely relative to the table
+    const tdWidth = 28; // minWidth of day cells
+    const labelWidth = 260; // width of first column
     
     return {
-      left: `${(startDays / totalDays) * 100}%`,
-      width: `${(duration / totalDays) * 100}%`
+      left: `calc(${labelWidth}px + ${leftDays * tdWidth}px)`,
+      width: `${duration * tdWidth}px`
     };
   };
 
@@ -312,6 +356,13 @@ const GanttChartGenerator: React.FC = () => {
               onChange={handleFileUpload}
               className="hidden"
             />
+            <input
+              ref={tgcInputRef}
+              type="file"
+              accept=".tgc"
+              onChange={handleTGCFileUpload}
+              className="hidden"
+            />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 px-4 py-2 bg-pink-300 text-gray-800 rounded hover:bg-pink-400 transition font-medium"
@@ -325,6 +376,18 @@ const GanttChartGenerator: React.FC = () => {
             >
               <Download className="w-4 h-4" />
               Export CSV
+            </button>
+            <button
+              onClick={saveProjectAsTGC}
+              className="flex items-center gap-2 px-4 py-2 bg-pink-300 text-gray-800 rounded hover:bg-pink-400 transition font-medium"
+            >
+              Save Project
+            </button>
+            <button
+              onClick={() => tgcInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-pink-300 text-gray-800 rounded hover:bg-pink-400 transition font-medium"
+            >
+              Open Project
             </button>
             {currentPage === 'edit' && (
               <button
@@ -365,6 +428,21 @@ const GanttChartGenerator: React.FC = () => {
                         </button>
                       </td>
                       <td className="border border-pink-300 p-3">
+            {/* Today line if within range */}
+            {(() => {
+              const today = new Date();
+              if (today < rangeStart || today > rangeEnd) return null;
+              const daysFromStart = (today.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24);
+              const leftPct = (daysFromStart / totalRangeDays) * 100;
+              return (
+                <div>
+                  <div className="absolute top-[52px] bottom-2" style={{ left: `${leftPct}%` }}>
+                    <div style={{ width: '2px', height: '100%', background: '#08a0ff' }} />
+                  </div>
+                  <div className="absolute -top-3 text-white text-sm font-bold px-3 py-1 rounded" style={{ left: `calc(${leftPct}% - 30px)`, background: '#08a0ff' }}>TODAY</div>
+                </div>
+              );
+            })()}
                         <input
                           type="text"
                           value={task.process}
@@ -395,72 +473,57 @@ const GanttChartGenerator: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="border-2 border-pink-300 rounded-lg overflow-hidden relative">
+          <div className="gantt-container overflow-hidden relative">
+            {/* Quarter banner */}
+            <div className="flex text-white text-xl font-bold">
+              <div className="flex-1 text-center py-3" style={{ background: '#2b78e4' }}>Q1</div>
+              <div className="flex-1 text-center py-3" style={{ background: '#00b0ff' }}>Q2</div>
+            </div>
             <div className="overflow-x-auto gantt-timeline">
-              <table className="w-full border-collapse">
+              <table className="w-full border-collapse gantt-grid">
                 <thead>
                   <tr>
-                    <th className="bg-pink-300 border-2 border-gray-800 p-4 text-center font-black text-gray-900 text-lg" rowSpan={2} style={{ width: '200px' }}>
-                      PROCESS
-                    </th>
-                    {quarters.map((quarter, idx) => (
-                      <th
-                        key={idx}
-                        className="bg-pink-200 border-2 border-gray-800 p-3 text-center font-black text-gray-900 text-base"
-                        colSpan={quarter.months.length}
-                      >
-                        {quarter.name}
-                      </th>
+                    <th className="gantt-row-label p-3 text-left" rowSpan={3} style={{ width: '260px' }}>Project Description</th>
+                    <th className="text-white p-2 text-center" style={{ background: '#2b78e4' }} colSpan={q1Days}>Q1</th>
+                    <th className="text-white p-2 text-center" style={{ background: '#00b0ff' }} colSpan={q2Days}>Q2</th>
+                  </tr>
+                  <tr>
+                    {months.map((m, mi) => (
+                      <th key={mi} className="text-white text-sm font-bold" style={{ background: m.color }} colSpan={m.days}>{m.key}</th>
                     ))}
                   </tr>
                   <tr>
-                    {months.map((month, idx) => (
-                      <th
-                        key={idx}
-                        className="bg-pink-200 border border-gray-800 p-2 text-center font-bold text-gray-900 text-sm"
-                        style={{ minWidth: '80px' }}
-                      >
-                        {month.name}
-                      </th>
+                    {dayColumns.map((c, idx) => (
+                      <th key={idx} className="gantt-day-cell p-1 text-xs" style={{ minWidth: '28px', background: months[c.monthIndex].band }}>{c.day}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {tasks.map((task) => {
+                  {tasks.map((task, rowIdx) => {
                     const displayTask = dragState.draggingTask === task.id && dragState.dragPreview 
                       ? { ...task, ...dragState.dragPreview }
                       : task;
+                    const colorClass = taskColors[rowIdx % taskColors.length];
                     return (
                       <tr key={task.id}>
-                        <td className="bg-white border-2 border-gray-800 p-4 font-medium text-gray-900" style={{ width: '200px' }}>
+                        <td className="gantt-row-label p-3 font-medium" style={{ width: '260px' }}>
                           {task.process}
                         </td>
-                        {months.map((_, monthIdx) => (
-                          <td
-                            key={monthIdx}
-                            className="bg-pink-50 border border-gray-400 p-0 relative"
-                            style={{ 
-                              height: '60px',
-                              minWidth: '80px'
-                            }}
-                          >
-                            {monthIdx === 0 && (() => {
+                        {dayColumns.map((c, dayIdx) => (
+                          <td key={dayIdx} className="gantt-day-cell p-0 relative" style={{ height: '44px', minWidth: '28px', background: months[c.monthIndex].band }}>
+                            {/* Only render the bar once in the first cell, but position it absolutely across all cells */}
+                            {dayIdx === 0 && (() => {
                               const barPosition = calculateBarPosition(displayTask.startDate, displayTask.endDate);
                               if (!barPosition) return null;
                               const isDragging = dragState.draggingTask === task.id;
                               return (
                                 <div
-                                  className={`absolute rounded transition-colors group ${
-                                    isDragging ? 'bg-pink-400 shadow-lg cursor-grabbing' : 'bg-pink-300 cursor-grab hover:bg-pink-400'
-                                  }`}
+                                  className={`absolute gantt-task-bar ${colorClass}`}
                                   style={{
                                     left: barPosition.left,
                                     width: barPosition.width,
-                                    height: '32px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    opacity: isDragging ? 0.8 : 1,
-                                    minWidth: '20px',
+                                    height: '16px',
+                                    opacity: isDragging ? 0.9 : 1,
                                     zIndex: 10
                                   }}
                                   onMouseDown={(e) => {
@@ -475,7 +538,7 @@ const GanttChartGenerator: React.FC = () => {
                                   }}
                                 >
                                   <div
-                                    className="absolute left-0 top-0 bottom-0 w-2 bg-pink-500 rounded-l cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize"
                                     onMouseDown={(e) => {
                                       e.stopPropagation();
                                       e.preventDefault();
@@ -484,7 +547,7 @@ const GanttChartGenerator: React.FC = () => {
                                     onClick={(e) => e.stopPropagation()}
                                   />
                                   <div
-                                    className="absolute right-0 top-0 bottom-0 w-2 bg-pink-500 rounded-r cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
                                     onMouseDown={(e) => {
                                       e.stopPropagation();
                                       e.preventDefault();
@@ -507,6 +570,28 @@ const GanttChartGenerator: React.FC = () => {
                   })}
                 </tbody>
               </table>
+            </div>
+            {/* Today line */}
+            {(() => {
+              const today = new Date();
+              if (today < rangeStart || today > rangeEnd) return null;
+              const daysFromStart = (today.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24);
+              const leftPct = (daysFromStart / totalRangeDays) * 100;
+              return (
+                <div>
+                  <div className="absolute top-[140px] bottom-2" style={{ left: `${leftPct}%` }}>
+                    <div style={{ width: '2px', height: '100%', background: '#08a0ff' }} />
+                  </div>
+                  <div className="absolute -top-3 text-white text-sm font-bold px-3 py-1 rounded" style={{ left: `calc(${leftPct}% - 30px)`, background: '#08a0ff' }}>TODAY</div>
+                </div>
+              );
+            })()}
+            <div className="gantt-legend">
+              <div className="legend-item"><span className="legend-swatch task-blue"></span> John Doe</div>
+              <div className="legend-item"><span className="legend-swatch task-teal"></span> Loran Doe</div>
+              <div className="legend-item"><span className="legend-swatch task-green"></span> Anthony Black</div>
+              <div className="legend-item"><span className="legend-swatch task-yellow"></span> Kate Small</div>
+              <div className="legend-item"><span className="legend-swatch task-red"></span> Jim White</div>
             </div>
           </div>
         )}

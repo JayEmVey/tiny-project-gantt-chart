@@ -1,0 +1,49 @@
+/* Clean Gantt theme inspired by the attached image */
+
+.gantt-container {
+  border-radius: 10px;
+  border: 2px solid #f19ac2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.gantt-month-gradient {
+  background: linear-gradient(90deg, #ef476f 0%, #f78da7 20%, #7ad9ff 40%, #49c5b6 60%, #8bc34a 80%, #ffb74d 100%);
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px 12px;
+  font-size: 18px;
+}
+
+/* Week header colors */
+.gantt-week-header { color: #fff; font-weight: 700; text-align: center; }
+.gantt-week-1 { background: #3a5ea8; }
+.gantt-week-2 { background: #18b0d6; }
+.gantt-week-3 { background: #69b34c; }
+.gantt-week-4 { background: #f0a83a; }
+
+/* Day cells */
+.gantt-grid td, .gantt-grid th { border: 1px solid rgba(0,0,0,0.08); }
+.gantt-day-cell { background: #eef8ff; text-align: center; color: #2d3b4f; }
+
+/* Row label */
+.gantt-row-label { background: #f7fafc; color: #425b6a; border-right: 1px solid rgba(0,0,0,0.1); font-weight: 600; }
+
+/* Bars */
+.gantt-task-bar { height: 16px; border-radius: 8px; position: absolute; top: 50%; transform: translateY(-50%); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+.task-blue { background: #33a3ff; }
+.task-teal { background: #2bb8b1; }
+.task-green { background: #7ac943; }
+.task-yellow { background: #ffb347; }
+.task-red { background: #ff5d5d; }
+
+/* Legend */
+.gantt-legend { display: flex; gap: 20px; align-items: center; padding: 10px 6px 6px; }
+.legend-item { display: flex; gap: 8px; align-items: center; color: #2d3b4f; }
+.legend-swatch { width: 18px; height: 10px; border-radius: 5px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+
+/* Table layout helpers */
+.gantt-timeline table { width: 100%; min-width: 1120px; }
+.gantt-timeline td { position: relative; overflow: visible; }

@@ -1,0 +1,126 @@
+.gantt-chart {
+  width: 100%;
+  font-size: 16px;
+  background: #fff0fa;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(220, 38, 120, 0.10);
+  border: 2px solid #e754a1;
+  padding: 0;
+  margin-bottom: 2rem;
+}
+
+.gantt-header {
+  display: flex;
+  background: #f8a4d8;
+  border-radius: 12px 12px 0 0;
+  padding: 0.5rem;
+  font-weight: 700;
+  border-bottom: 2px solid #222;
+  box-shadow: none;
+}
+
+.gantt-header-left {
+  width: 200px;
+  flex-shrink: 0;
+  padding-right: 1rem;
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #222;
+  text-align: left;
+}
+
+.gantt-body {
+  background: #fff0fa;
+  border-radius: 0 0 12px 12px;
+  box-shadow: none;
+}
+
+.gantt-row {
+  display: flex;
+  border-bottom: 1px solid #e2a4c8;
+  min-height: 56px;
+  align-items: center;
+  background: #fff;
+  transition: background 0.2s;
+}
+
+.gantt-row:hover {
+  background: #fff0fa;
+}
+
+.gantt-row:last-child {
+  border-bottom: none;
+}
+
+.gantt-task-name {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 1rem 0.75rem;
+  font-weight: 600;
+  word-wrap: break-word;
+  color: #222;
+  background: #fff;
+  border-right: 2px solid #e2a4c8;
+}
+
+.gantt-task-timeline {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  padding: 0.75rem 0.5rem;
+  background: #fff0fa;
+}
+
+.gantt-task-bar {
+  position: absolute;
+  height: 32px;
+  background: #f8a4d8;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  overflow: hidden;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+}
+
+.gantt-task-bar:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(220, 38, 120, 0.10);
+}
+
+.gantt-task-label {
+  display: none;
+}
+
+th, td {
+  background: #fff6fa;
+  border: 1px solid #c9b6c8 !important;
+  text-align: center;
+}
+
+th {
+  font-weight: bold;
+  color: #222;
+  background: #f8a4d8 !important;
+  font-size: 1.1em;
+}
+
+td {
+  color: #222;
+  font-size: 1em;
+}
+
+@media (max-width: 768px) {
+  .gantt-chart {
+    font-size: 12px;
+  }
+  .gantt-header-left,
+  .gantt-task-name {
+    width: 150px;
+  }
+  .gantt-task-bar {
+    height: 28px;
+  }
+}
