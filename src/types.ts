@@ -1,17 +1,16 @@
 export interface Task {
-  id: string
-  name: string
-  startDate: Date
-  endDate: Date
-  progress: number
-  dependencies?: string[]
-}
-
-export interface GanttTask {
   id: number
   process: string
-  startDate: string
-  endDate: string
+  startDate: string // DD/MM/YYYY format
+  endDate: string   // DD/MM/YYYY format
+}
+
+export interface DragState {
+  draggingTask: number | null
+  dragStartX: number
+  dragType: 'move' | 'resize-left' | 'resize-right' | null
+  dragPreview: { startDate: string; endDate: string } | null
+  originalTaskState: Task | null
 }
 
 export interface Month {

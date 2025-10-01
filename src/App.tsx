@@ -1,5 +1,4 @@
-import React from 'react'
-import GanttChartGenerator from './components/GanttChartGenerator'
+import GanttChartGenerator from './components/GanttChartGenerator/GanttChartGenerator'
 import './App.css'
 
 function App() {

@@ -1,51 +1,74 @@
-.gantt-chart {
+/* Gantt Chart specific styles */
+.gantt-timeline {
+  position: relative;
+}
+
+.gantt-timeline table {
   width: 100%;
-  font-size: 14px;
+  min-width: 1200px; /* Ensure minimum width for proper bar display */
 }
 
-.gantt-chart-empty {
-  text-align: center;
-  padding: 3rem;
-  color: #888;
-  font-size: 1.2em;
+.gantt-timeline td {
+  position: relative;
+  overflow: visible;
 }
 
-.gantt-header {
-  display: flex;
-  background: rgba(100, 100, 100, 0.2);
-  border-radius: 4px 4px 0 0;
-  padding: 0.75rem;
-  font-weight: 600;
-  border-bottom: 2px solid rgba(100, 100, 100, 0.3);
+.gantt-timeline tbody tr td:nth-child(2) {
+  position: relative;
+  overflow: visible;
 }
 
-.gantt-header-left {
-  width: 200px;
-  flex-shrink: 0;
-  padding-right: 1rem;
+.gantt-timeline tbody tr td:nth-child(2) > div {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 32px;
+  border-radius: 4px;
+  z-index: 10;
+  /* Make the bar extend across all timeline columns */
+  width: calc(100vw - 200px);
+  max-width: calc(100% * 12); /* 12 months */
+  pointer-events: auto;
 }
 
-.gantt-header-right {
-  flex: 1;
-  min-width: 0;
+.gantt-bar {
+  pointer-events: all;
+  position: absolute;
+  height: 32px;
+  border-radius: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.2s ease;
+  min-width: 20px;
 }
 
-.gantt-timeline-header {
-  display: flex;
-  justify-content: space-between;
-  padding: 0 0.5rem;
+.gantt-bar:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-.gantt-body {
-  background: rgba(50, 50, 50, 0.1);
-  border-radius: 0 0 4px 4px;
+.gantt-bar-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: rgba(236, 72, 153, 0.8);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  cursor: ew-resize;
 }
 
-.gantt-row {
-  display: flex;
-  border-bottom: 1px solid rgba(100, 100, 100, 0.2);
-  min-height: 50px;
-  align-items: center;
+.gantt-bar:hover .gantt-bar-handle {
+  opacity: 1;
+}
+
+.gantt-bar-handle.left {
+  left: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.gantt-bar-handle.right {
+  right: 0;
+  border-radius: 0 4px 4px 0;
 }
 
 .gantt-row:last-child {
