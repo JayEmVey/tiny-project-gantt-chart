@@ -1,16 +1,65 @@
+button, input[type="text"], input[type="date"] {
+  transition: box-shadow 0.2s, background 0.2s, border 0.2s;
+}
+
+button {
+  box-shadow: 0 2px 8px rgba(220, 38, 120, 0.07);
+  font-size: 1em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+button:hover, button:focus {
+  box-shadow: 0 4px 16px rgba(220, 38, 120, 0.12);
+  background: #f472b6;
+  color: #fff;
+  outline: none;
+}
+
+input[type="text"], input[type="date"] {
+  box-shadow: 0 1px 4px rgba(220, 38, 120, 0.05);
+  border-radius: 6px;
+  border: 1.5px solid #f472b6;
+  padding: 0.5em 0.75em;
+  font-size: 1em;
+}
+
+input[type="text"]:focus, input[type="date"]:focus {
+  box-shadow: 0 2px 8px rgba(220, 38, 120, 0.10);
+  border-color: #be185d;
+  outline: none;
+}
 .app {
   max-width: 1400px;
   margin: 0 auto;
+  background: linear-gradient(120deg, #f8fafc 0%, #ffe4e6 100%);
+  box-shadow: 0 4px 24px rgba(220, 38, 120, 0.08);
+  border-radius: 16px;
+  padding: 2rem 1rem;
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  color: #2d2d2d;
 }
 
 header {
   text-align: center;
   margin-bottom: 2rem;
+  background: rgba(255, 228, 230, 0.5);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(220, 38, 120, 0.07);
+  padding: 1.5rem 0;
 }
 
 header p {
   color: #888;
   font-size: 1.1em;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.6;
+}
+body, html {
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  background: #f8fafc;
+  color: #2d2d2d;
 }
 
 main {
@@ -18,10 +67,13 @@ main {
   border-radius: 8px;
   padding: 1.5rem;
   overflow-x: auto;
+  box-shadow: 0 2px 12px rgba(220, 38, 120, 0.06);
+  margin-bottom: 2rem;
 }
 
 @media (prefers-color-scheme: light) {
   main {
     background: rgba(0, 0, 0, 0.02);
+    box-shadow: 0 2px 12px rgba(220, 38, 120, 0.04);
   }
 }
