@@ -1,10 +1,10 @@
-import GanttChartGenerator from './components/GanttChartGenerator/GanttChartGenerator'
+import GanttChartMain from './components/GanttChartGenerator/GanttChartMain'
 import './App.css'
 
 function App() {
   return (
     <div className="app">
-      <GanttChartGenerator />
+      <GanttChartMain />
     </div>
   )
 }

@@ -49,7 +49,7 @@ const ChartView: React.FC<ChartViewProps> = ({
                 <td className="bg-white border-2 border-gray-800 p-4 font-medium text-gray-900">
                   {task.process}
                 </td>
-                {months.map((month, monthIdx) => (
+                {months.map((_month, monthIdx) => (
                   <td
                     key={monthIdx}
                     className="bg-pink-50 border border-gray-400 p-0 relative"

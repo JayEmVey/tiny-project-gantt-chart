@@ -1,9 +1,24 @@
+export interface TaskDependency {
+  taskId: number
+  type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish'
+}
+
 export interface Task {
   id: number
   process: string
   startDate: string // DD/MM/YYYY format
   endDate: string   // DD/MM/YYYY format
+  assignee?: string
+  status?: 'not-started' | 'in-progress' | 'completed' | 'overdue'
+  priority?: 'low' | 'medium' | 'high'
+  progress?: number // 0-100
+  description?: string
+  dependencies?: number[] // IDs of tasks this depends on (for backward compatibility)
+  dependenciesV2?: TaskDependency[] // New format with dependency types
 }
+
+// Alias for backward compatibility
+export type GanttTask = Task
 
 export interface DragState {
   draggingTask: number | null
@@ -27,4 +42,12 @@ export interface Quarter {
 export interface BarPosition {
   left: string
   width: string
+}
+
+export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter'
+
+export interface Dependency {
+  fromTaskId: number
+  toTaskId: number
+  type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish'
 }

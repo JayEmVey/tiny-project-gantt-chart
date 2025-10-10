@@ -1,0 +1,116 @@
+/* Drag and Drop Animations */
+
+/* Task dragging transparency */
+.task-dragging {
+  opacity: 0.5;
+  cursor: grabbing !important;
+}
+
+/* Drop indicator animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.drop-indicator {
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* Task card snap animation */
+@keyframes snapIntoPlace {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.task-snap {
+  animation: snapIntoPlace 0.3s ease-in-out;
+}
+
+/* Hover effects */
+.task-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Gantt bar hover effect */
+.gantt-bar {
+  transition: all 0.3s ease-in-out;
+}
+
+.gantt-bar:hover {
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Modal animation */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.modal-content {
+  animation: modalFadeIn 0.3s ease-in-out;
+}
+
+/* Backdrop animation */
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-backdrop {
+  animation: backdropFadeIn 0.2s ease-in-out;
+}
+
+/* Smooth reorder animation */
+.task-reordering {
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+/* Highlight drop target */
+.drop-target-highlight {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Critical path indicator pulse */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.critical-path-indicator {
+  animation: pulse 2s ease-in-out infinite;
+}

@@ -31,13 +31,42 @@
 /* Row label */
 .gantt-row-label { background: #f7fafc; color: #425b6a; border-right: 1px solid rgba(0,0,0,0.1); font-weight: 600; }
 
-/* Bars */
-.gantt-task-bar { height: 16px; border-radius: 8px; position: absolute; top: 50%; transform: translateY(-50%); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
-.task-blue { background: #33a3ff; }
-.task-teal { background: #2bb8b1; }
-.task-green { background: #7ac943; }
-.task-yellow { background: #ffb347; }
-.task-red { background: #ff5d5d; }
+/* Bars - Calm Productivity Aesthetic */
+.gantt-task-bar {
+  height: 16px;
+  border-radius: 8px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+}
+
+.gantt-task-bar:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-50%) scale(1.02);
+}
+
+/* Status-based colors with calm tones */
+.task-blue {
+  background: linear-gradient(135deg, #5b9bd5 0%, #4a89c5 100%);
+}
+
+.task-teal {
+  background: linear-gradient(135deg, #70ad47 0%, #5f9a3a 100%);
+}
+
+.task-green {
+  background: linear-gradient(135deg, #70ad47 0%, #5f9a3a 100%);
+}
+
+.task-yellow {
+  background: linear-gradient(135deg, #ffc000 0%, #f0b000 100%);
+}
+
+.task-red {
+  background: linear-gradient(135deg, #ed7d31 0%, #d86d2a 100%);
+}
 
 /* Legend */
 .gantt-legend { display: flex; gap: 20px; align-items: center; padding: 10px 6px 6px; }
@@ -47,3 +76,30 @@
 /* Table layout helpers */
 .gantt-timeline table { width: 100%; min-width: 1120px; }
 .gantt-timeline td { position: relative; overflow: visible; }
+
+/* Horizontal scrolling */
+.gantt-timeline {
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Custom scrollbar styling */
+.gantt-timeline::-webkit-scrollbar {
+  height: 12px;
+}
+
+.gantt-timeline::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 6px;
+}
+
+.gantt-timeline::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 6px;
+}
+
+.gantt-timeline::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
