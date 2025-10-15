@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect, forwardRef } from 'react';
-import { Task, ZoomLevel } from '../../types';
+import { Task, ZoomLevel, Epic } from '../../types';
+import { calculateEpicDates } from '../../utils/epicDateCalculator';
 
 interface GanttChartViewProps {
   tasks: Task[];
+  epics: Epic[];
   zoomLevel: ZoomLevel;
   onTaskClick: (task: Task) => void;
+  onEpicClick?: (epic: Epic) => void;
   onEmptyCellClick: (date: Date, taskIndex?: number) => void;
   onTaskDragInChart: (taskId: number, newStartDate: string, newEndDate: string) => void;
   showCriticalPath: boolean;
@@ -17,8 +20,10 @@ interface BarPosition {
 
 const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   tasks,
+  epics,
   zoomLevel,
   onTaskClick,
+  onEpicClick,
   onEmptyCellClick,
   onTaskDragInChart,
   showCriticalPath
@@ -158,26 +163,56 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
     const end = parseDate(endDate);
     const yearStart = new Date(start.getFullYear(), 0, 1);
 
-    let startIndex = 0;
-    let endIndex = 0;
+    let startPosition = 0;
+    let endPosition = 0;
 
     if (zoomLevel === 'day') {
-      startIndex = Math.floor((start.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
-      endIndex = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+      startPosition = Math.floor((start.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+      endPosition = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
     } else if (zoomLevel === 'week') {
-      startIndex = Math.floor((start.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      endIndex = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      startPosition = Math.floor((start.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      endPosition = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
     } else if (zoomLevel === 'month') {
-      startIndex = start.getMonth();
-      endIndex = end.getMonth();
+      // For month view, we need more granular positioning within each month
+      const startMonth = start.getMonth();
+      const endMonth = end.getMonth();
+      const startDay = start.getDate();
+      const endDay = end.getDate();
+
+      // Get the number of days in start and end months
+      const daysInStartMonth = new Date(start.getFullYear(), startMonth + 1, 0).getDate();
+      const daysInEndMonth = new Date(end.getFullYear(), endMonth + 1, 0).getDate();
+
+      // Calculate fractional position within the month
+      const startFraction = (startDay - 1) / daysInStartMonth; // -1 because day 1 should start at 0%
+      const endFraction = endDay / daysInEndMonth;
+
+      startPosition = startMonth + startFraction;
+      endPosition = endMonth + endFraction;
     } else if (zoomLevel === 'quarter') {
-      startIndex = Math.floor(start.getMonth() / 3);
-      endIndex = Math.floor(end.getMonth() / 3);
+      // For quarter view, calculate position within the quarter
+      const startQuarter = Math.floor(start.getMonth() / 3);
+      const endQuarter = Math.floor(end.getMonth() / 3);
+      const startMonthInQuarter = start.getMonth() % 3;
+      const endMonthInQuarter = end.getMonth() % 3;
+      const startDay = start.getDate();
+      const endDay = end.getDate();
+
+      // Get days in the month
+      const daysInStartMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
+      const daysInEndMonth = new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate();
+
+      // Calculate fractional position within the quarter (each quarter has 3 months)
+      const startFraction = (startMonthInQuarter + (startDay - 1) / daysInStartMonth) / 3;
+      const endFraction = (endMonthInQuarter + endDay / daysInEndMonth) / 3;
+
+      startPosition = startQuarter + startFraction;
+      endPosition = endQuarter + endFraction;
     }
 
     const columnWidth = 100 / timeColumns.length;
-    const left = startIndex * columnWidth;
-    const width = (endIndex - startIndex + 1) * columnWidth;
+    const left = startPosition * columnWidth;
+    const width = (endPosition - startPosition) * columnWidth;
 
     return {
       left: `${left}%`,
@@ -192,6 +227,28 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
     if (task.status === 'overdue') return 'bg-red-400';
     return 'bg-gray-300';
   };
+
+  // Get color based on Epic status
+  const getEpicColor = (epic: Epic): string => {
+    if (epic.status === 'completed') return 'bg-green-500';
+    if (epic.status === 'in-progress') return 'bg-blue-500';
+    if (epic.status === 'overdue') return 'bg-red-500';
+    return 'bg-gray-400';
+  };
+
+  // Prepare Epic data with calculated dates
+  const epicsWithDates = epics.map(epic => {
+    const dates = calculateEpicDates(epic.id, tasks);
+    return {
+      ...epic,
+      startDate: dates?.startDate,
+      endDate: dates?.endDate
+    };
+  }).filter(epic => epic.startDate && epic.endDate); // Only show epics with tasks
+
+  // Determine what to display based on zoom level
+  const shouldShowEpics = zoomLevel === 'month' || zoomLevel === 'quarter';
+  const itemsToDisplay = shouldShowEpics ? epicsWithDates : tasks;
 
   const handleCellClick = (columnIndex: number, taskIndex: number) => {
     const column = timeColumns[columnIndex];
@@ -280,7 +337,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {/* Time Period Row */}
             <tr>
               <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
-                Task
+                {shouldShowEpics ? 'Epic' : 'Task'}
               </th>
               {timeColumns.map((column, idx) => (
                 <th
@@ -293,84 +350,163 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task, taskIndex) => {
-              const barPosition = calculateBarPosition(task.startDate, task.endDate);
-              const colorClass = getTaskColor(task);
+            {shouldShowEpics ? (
+              // Render Epics in Month/Quarter view
+              epicsWithDates.map((epic, epicIndex) => {
+                const barPosition = epic.startDate && epic.endDate ? calculateBarPosition(epic.startDate, epic.endDate) : null;
+                const colorClass = getEpicColor(epic);
 
-              return (
-                <tr key={task.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
-                    <div className="flex flex-col">
-                      <span>{task.process}</span>
-                      {task.assignee && (
-                        <span className="text-xs text-gray-500">{task.assignee}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>
-                    <div className="relative w-full h-16" style={{ display: 'flex' }}>
-                      {timeColumns.map((column, colIdx) => (
-                        <div
-                          key={colIdx}
-                          className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
-                          onClick={() => handleCellClick(colIdx, taskIndex)}
-                          style={{ minWidth: '48px', height: '64px', flexGrow: 1 }}
-                        />
-                      ))}
-                      {/* Render task bar as overlay spanning across days */}
-                      {barPosition && (
-                        <div
-                          className={`absolute top-1/2 transform -translate-y-1/2 ${colorClass} rounded-lg shadow cursor-move transition-all duration-300 hover:shadow-lg`}
-                          style={{
-                            left: barPosition.left,
-                            width: barPosition.width,
-                            height: '32px',
-                            opacity: draggedTask?.task.id === task.id ? 0.5 : 1,
-                            zIndex: 5
-                          }}
-                          onMouseDown={(e) => handleTaskMouseDown(e, task)}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onTaskClick(task);
-                          }}
-                        >
-                          {/* Progress indicator */}
-                          {task.progress !== undefined && task.progress > 0 && (
-                            <div
-                              className="absolute left-0 top-0 bottom-0 bg-black bg-opacity-20 rounded-l-lg"
-                              style={{ width: `${task.progress}%` }}
-                            />
-                          )}
-                          {/* Critical path indicator */}
-                          {showCriticalPath && task.dependencies && task.dependencies.length > 0 && (
-                            <div className="absolute inset-0 border-2 border-red-500 rounded-lg" />
-                          )}
-                        </div>
-                      )}
-                      {/* Today marker for this row */}
-                      {taskIndex === 0 && todayPosition !== null && (
-                        <div
-                          className="absolute pointer-events-none"
-                          style={{
-                            left: `${todayPosition}%`,
-                            top: '-100vh',
-                            bottom: '-100vh',
-                            zIndex: 20
-                          }}
-                        >
-                          <div className="relative h-full">
-                            <div className="absolute w-0.5 h-full bg-red-500" />
-                            <div className="absolute -top-0 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap">
-                              Now
+                return (
+                  <tr key={epic.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
+                      <div className="flex flex-col">
+                        <span>{epic.name}</span>
+                        {epic.assignee && (
+                          <span className="text-xs text-gray-500">{epic.assignee}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>
+                      <div className="relative w-full h-16" style={{ display: 'flex' }}>
+                        {timeColumns.map((column, colIdx) => (
+                          <div
+                            key={colIdx}
+                            className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
+                            onClick={() => handleCellClick(colIdx, epicIndex)}
+                            style={{ minWidth: '48px', height: '64px', flexGrow: 1 }}
+                          />
+                        ))}
+                        {/* Render epic bar as overlay */}
+                        {barPosition && (
+                          <div
+                            className={`absolute top-1/2 transform -translate-y-1/2 ${colorClass} rounded-lg shadow cursor-pointer transition-all duration-300 hover:shadow-lg`}
+                            style={{
+                              left: barPosition.left,
+                              width: barPosition.width,
+                              height: '32px',
+                              zIndex: 5
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onEpicClick) {
+                                onEpicClick(epic);
+                              }
+                            }}
+                          >
+                            {/* Progress indicator */}
+                            {epic.progress !== undefined && epic.progress > 0 && (
+                              <div
+                                className="absolute left-0 top-0 bottom-0 bg-black bg-opacity-20 rounded-l-lg"
+                                style={{ width: `${epic.progress}%` }}
+                              />
+                            )}
+                          </div>
+                        )}
+                        {/* Today marker for first row */}
+                        {epicIndex === 0 && todayPosition !== null && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${todayPosition}%`,
+                              top: '-100vh',
+                              bottom: '-100vh',
+                              zIndex: 20
+                            }}
+                          >
+                            <div className="relative h-full">
+                              <div className="absolute w-0.5 h-full bg-red-500" />
+                              <div className="absolute -top-0 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap">
+                                Now
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              // Render Tasks in Day/Week view
+              tasks.map((task, taskIndex) => {
+                const barPosition = calculateBarPosition(task.startDate, task.endDate);
+                const colorClass = getTaskColor(task);
+
+                return (
+                  <tr key={task.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
+                      <div className="flex flex-col">
+                        <span>{task.process}</span>
+                        {task.assignee && (
+                          <span className="text-xs text-gray-500">{task.assignee}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>
+                      <div className="relative w-full h-16" style={{ display: 'flex' }}>
+                        {timeColumns.map((column, colIdx) => (
+                          <div
+                            key={colIdx}
+                            className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
+                            onClick={() => handleCellClick(colIdx, taskIndex)}
+                            style={{ minWidth: '48px', height: '64px', flexGrow: 1 }}
+                          />
+                        ))}
+                        {/* Render task bar as overlay spanning across days */}
+                        {barPosition && (
+                          <div
+                            className={`absolute top-1/2 transform -translate-y-1/2 ${colorClass} rounded-lg shadow cursor-move transition-all duration-300 hover:shadow-lg`}
+                            style={{
+                              left: barPosition.left,
+                              width: barPosition.width,
+                              height: '32px',
+                              opacity: draggedTask?.task.id === task.id ? 0.5 : 1,
+                              zIndex: 5
+                            }}
+                            onMouseDown={(e) => handleTaskMouseDown(e, task)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onTaskClick(task);
+                            }}
+                          >
+                            {/* Progress indicator */}
+                            {task.progress !== undefined && task.progress > 0 && (
+                              <div
+                                className="absolute left-0 top-0 bottom-0 bg-black bg-opacity-20 rounded-l-lg"
+                                style={{ width: `${task.progress}%` }}
+                              />
+                            )}
+                            {/* Critical path indicator */}
+                            {showCriticalPath && task.dependencies && task.dependencies.length > 0 && (
+                              <div className="absolute inset-0 border-2 border-red-500 rounded-lg" />
+                            )}
+                          </div>
+                        )}
+                        {/* Today marker for this row */}
+                        {taskIndex === 0 && todayPosition !== null && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${todayPosition}%`,
+                              top: '-100vh',
+                              bottom: '-100vh',
+                              zIndex: 20
+                            }}
+                          >
+                            <div className="relative h-full">
+                              <div className="absolute w-0.5 h-full bg-red-500" />
+                              <div className="absolute -top-0 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap">
+                                Now
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>

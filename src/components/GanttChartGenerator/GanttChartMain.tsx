@@ -423,9 +423,11 @@ const GanttChartMain: React.FC = () => {
         {/* Gantt Chart View */}
         <GanttChartView
           ref={ganttScrollRef}
-          tasks={filteredTasks}
+          tasks={tasks}
+          epics={epics}
           zoomLevel={zoomLevel}
           onTaskClick={handleTaskClick}
+          onEpicClick={handleEditEpic}
           onEmptyCellClick={handleEmptyCellClick}
           onTaskDragInChart={handleTaskDragInChart}
           showCriticalPath={showCriticalPath}
