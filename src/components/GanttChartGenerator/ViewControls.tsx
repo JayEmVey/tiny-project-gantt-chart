@@ -7,32 +7,37 @@ interface ViewControlsProps {
   onZoomChange: (level: ZoomLevel) => void;
   showCriticalPath: boolean;
   onToggleCriticalPath: (show: boolean) => void;
+  onNavigateLeft?: () => void;
+  onNavigateRight?: () => void;
+  onNavigateToToday?: () => void;
 }
 
 const ViewControls: React.FC<ViewControlsProps> = ({
   zoomLevel,
   onZoomChange,
   showCriticalPath,
-  onToggleCriticalPath
+  onToggleCriticalPath,
+  onNavigateLeft,
+  onNavigateRight,
+  onNavigateToToday
 }) => {
   const zoomLevels: ZoomLevel[] = ['day', 'week', 'month', 'quarter'];
 
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* View Mode Selector */}
+        {/* View Mode Selector - Segmented Control */}
         <div className="flex items-center gap-2">
-          <span className="text-gray-700 font-medium mr-2">Day</span>
-          <div className="flex border-2 border-gray-800 rounded-lg overflow-hidden">
-            {zoomLevels.slice(1).map((level) => (
+          <div className="inline-flex border-2 border-gray-800 rounded-lg overflow-hidden">
+            {zoomLevels.map((level) => (
               <button
                 key={level}
                 onClick={() => onZoomChange(level)}
                 className={`
-                  px-6 py-2 font-medium capitalize transition-colors border-r-2 last:border-r-0 border-gray-800
+                  px-6 py-2 font-medium capitalize transition-all border-r-2 last:border-r-0 border-gray-800
                   ${zoomLevel === level
                     ? 'bg-gray-800 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
+                    : 'bg-white text-gray-700 hover:bg-gray-100'
                   }
                 `}
               >
@@ -59,14 +64,26 @@ const ViewControls: React.FC<ViewControlsProps> = ({
 
           {/* Navigation Controls */}
           <div className="flex items-center gap-2">
-            <button className="p-2 border-2 border-gray-800 rounded hover:bg-gray-50 transition-colors">
+            <button
+              onClick={onNavigateLeft}
+              className="p-2 border-2 border-gray-800 rounded hover:bg-gray-50 transition-colors"
+              title="Navigate left"
+            >
               <ChevronLeft className="w-5 h-5" strokeWidth={2} />
             </button>
-            <button className="p-2 border-2 border-gray-800 rounded hover:bg-gray-50 transition-colors">
-              <ChevronRight className="w-5 h-5" strokeWidth={2} />
+            <button
+              onClick={onNavigateToToday}
+              className="px-4 py-2 border-2 border-gray-800 rounded hover:bg-gray-50 transition-colors font-medium"
+              title="Go to today"
+            >
+              Today
             </button>
-            <button className="p-2 border-2 border-gray-800 rounded hover:bg-gray-50 transition-colors">
-              <span className="px-2 font-medium">•••</span>
+            <button
+              onClick={onNavigateRight}
+              className="p-2 border-2 border-gray-800 rounded hover:bg-gray-50 transition-colors"
+              title="Navigate right"
+            >
+              <ChevronRight className="w-5 h-5" strokeWidth={2} />
             </button>
           </div>
         </div>

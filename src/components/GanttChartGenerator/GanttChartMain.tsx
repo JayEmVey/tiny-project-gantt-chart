@@ -56,10 +56,11 @@ const GanttChartMain: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('week');
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
 
   const chartRef = useRef<HTMLDivElement>(null);
+  const ganttScrollRef = useRef<HTMLDivElement>(null);
 
   // Filter tasks based on search term
   const filteredTasks = tasks.filter(task =>
@@ -169,6 +170,41 @@ const GanttChartMain: React.FC = () => {
     }
   };
 
+  // Handle navigate to today
+  const handleNavigateToToday = () => {
+    if (!ganttScrollRef.current) return;
+
+    const today = new Date();
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    let todayIndex = 0;
+
+    if (zoomLevel === 'day') {
+      todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+    } else if (zoomLevel === 'week') {
+      todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    } else if (zoomLevel === 'month') {
+      todayIndex = today.getMonth();
+    } else if (zoomLevel === 'quarter') {
+      todayIndex = Math.floor(today.getMonth() / 3);
+    }
+
+    // Calculate scroll position (approximate)
+    const scrollAmount = (todayIndex / (zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4)) * ganttScrollRef.current.scrollWidth;
+    ganttScrollRef.current.scrollTo({ left: scrollAmount - ganttScrollRef.current.clientWidth / 2, behavior: 'smooth' });
+  };
+
+  // Handle navigate left
+  const handleNavigateLeft = () => {
+    if (!ganttScrollRef.current) return;
+    ganttScrollRef.current.scrollBy({ left: -ganttScrollRef.current.clientWidth * 0.5, behavior: 'smooth' });
+  };
+
+  // Handle navigate right
+  const handleNavigateRight = () => {
+    if (!ganttScrollRef.current) return;
+    ganttScrollRef.current.scrollBy({ left: ganttScrollRef.current.clientWidth * 0.5, behavior: 'smooth' });
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
@@ -184,6 +220,9 @@ const GanttChartMain: React.FC = () => {
         onZoomChange={setZoomLevel}
         showCriticalPath={showCriticalPath}
         onToggleCriticalPath={setShowCriticalPath}
+        onNavigateLeft={handleNavigateLeft}
+        onNavigateRight={handleNavigateRight}
+        onNavigateToToday={handleNavigateToToday}
       />
 
       {/* Main Content: Task List + Gantt Chart */}
@@ -198,6 +237,7 @@ const GanttChartMain: React.FC = () => {
 
         {/* Gantt Chart View */}
         <GanttChartView
+          ref={ganttScrollRef}
           tasks={filteredTasks}
           zoomLevel={zoomLevel}
           onTaskClick={handleTaskClick}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef } from 'react';
 import { Task, ZoomLevel } from '../../types';
 
 interface GanttChartViewProps {
@@ -15,14 +15,14 @@ interface BarPosition {
   width: string;
 }
 
-const GanttChartView: React.FC<GanttChartViewProps> = ({
+const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   tasks,
   zoomLevel,
   onTaskClick,
   onEmptyCellClick,
   onTaskDragInChart,
   showCriticalPath
-}) => {
+}, scrollRef) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [draggedTask, setDraggedTask] = useState<{ task: Task; startX: number } | null>(null);
 
@@ -40,7 +40,9 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
         columns.push({
           label: `${i + 1}`,
           date: weekStart,
-          type: 'week'
+          type: 'week',
+          month: weekStart.getMonth(),
+          monthName: weekStart.toLocaleDateString('en-US', { month: 'short' })
         });
       }
     } else if (zoomLevel === 'month') {
@@ -49,7 +51,9 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
         columns.push({
           label: new Date(today.getFullYear(), i, 1).toLocaleDateString('en-US', { month: 'short' }),
           date: new Date(today.getFullYear(), i, 1),
-          type: 'month'
+          type: 'month',
+          month: i,
+          monthName: new Date(today.getFullYear(), i, 1).toLocaleDateString('en-US', { month: 'short' })
         });
       }
     } else if (zoomLevel === 'quarter') {
@@ -58,7 +62,9 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
         columns.push({
           label: `Q${i + 1}`,
           date: new Date(today.getFullYear(), i * 3, 1),
-          type: 'quarter'
+          type: 'quarter',
+          month: i * 3,
+          monthName: ''
         });
       }
     } else {
@@ -69,7 +75,9 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
         columns.push({
           label: date.getDate().toString(),
           date: date,
-          type: 'day'
+          type: 'day',
+          month: date.getMonth(),
+          monthName: date.toLocaleDateString('en-US', { month: 'short' })
         });
       }
     }
@@ -78,6 +86,65 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
   };
 
   const timeColumns = generateTimeColumns();
+
+  // Group columns by month for day view header
+  const getMonthGroups = () => {
+    if (zoomLevel !== 'day') return [];
+
+    const groups: { monthName: string; count: number; startIndex: number }[] = [];
+    let currentMonth = -1;
+    let currentGroup: { monthName: string; count: number; startIndex: number } | null = null;
+
+    timeColumns.forEach((col, idx) => {
+      if (col.month !== currentMonth) {
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+        currentMonth = col.month;
+        currentGroup = {
+          monthName: col.monthName,
+          count: 1,
+          startIndex: idx
+        };
+      } else if (currentGroup) {
+        currentGroup.count++;
+      }
+    });
+
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  };
+
+  const monthGroups = getMonthGroups();
+
+  // Calculate today's position
+  const getTodayPosition = (): number | null => {
+    const today = new Date();
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+
+    let todayIndex = 0;
+
+    if (zoomLevel === 'day') {
+      todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+    } else if (zoomLevel === 'week') {
+      todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    } else if (zoomLevel === 'month') {
+      todayIndex = today.getMonth();
+    } else if (zoomLevel === 'quarter') {
+      todayIndex = Math.floor(today.getMonth() / 3);
+    }
+
+    // Check if today is within the visible range
+    if (todayIndex < 0 || todayIndex >= timeColumns.length) return null;
+
+    const columnWidth = 100 / timeColumns.length;
+    return todayIndex * columnWidth;
+  };
+
+  const todayPosition = getTodayPosition();
 
   // Parse date from DD/MM/YYYY format
   const parseDate = (dateStr: string): Date => {
@@ -170,10 +237,28 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
   ].filter(q => q.months.length > 0);
 
   return (
-    <div ref={chartRef} className="flex-1 overflow-auto bg-gray-50">
-      <div className="min-w-max">
+    <div ref={scrollRef} className="flex-1 overflow-auto bg-gray-50">
+      <div ref={chartRef} className="min-w-max relative">
         <table className="w-full border-collapse">
           <thead>
+            {/* Month Row (for day view) */}
+            {zoomLevel === 'day' && monthGroups.length > 0 && (
+              <tr>
+                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                  {/* Empty cell for task names column */}
+                </th>
+                {monthGroups.map((group, idx) => (
+                  <th
+                    key={idx}
+                    colSpan={group.count}
+                    className="bg-blue-100 border-2 border-gray-800 p-3 text-center font-bold text-gray-800 text-base"
+                  >
+                    {group.monthName}
+                  </th>
+                ))}
+              </tr>
+            )}
+
             {/* Quarter Row (only for certain zoom levels) */}
             {(zoomLevel === 'week' || zoomLevel === 'month') && (
               <tr>
@@ -222,14 +307,18 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                       )}
                     </div>
                   </td>
-                  {timeColumns.map((column, colIdx) => (
-                    <td
-                      key={colIdx}
-                      className="border border-gray-200 relative h-16 cursor-pointer hover:bg-blue-50 transition-colors"
-                      onClick={() => handleCellClick(colIdx, taskIndex)}
-                      style={{ minHeight: '60px' }}
-                    >
-                      {colIdx === 0 && barPosition && (
+                  <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>
+                    <div className="relative w-full h-16" style={{ display: 'flex' }}>
+                      {timeColumns.map((column, colIdx) => (
+                        <div
+                          key={colIdx}
+                          className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
+                          onClick={() => handleCellClick(colIdx, taskIndex)}
+                          style={{ minWidth: '48px', height: '64px', flexGrow: 1 }}
+                        />
+                      ))}
+                      {/* Render task bar as overlay spanning across days */}
+                      {barPosition && (
                         <div
                           className={`absolute top-1/2 transform -translate-y-1/2 ${colorClass} rounded-lg shadow cursor-move transition-all duration-300 hover:shadow-lg`}
                           style={{
@@ -258,8 +347,27 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
                           )}
                         </div>
                       )}
-                    </td>
-                  ))}
+                      {/* Today marker for this row */}
+                      {taskIndex === 0 && todayPosition !== null && (
+                        <div
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: `${todayPosition}%`,
+                            top: '-100vh',
+                            bottom: '-100vh',
+                            zIndex: 20
+                          }}
+                        >
+                          <div className="relative h-full">
+                            <div className="absolute w-0.5 h-full bg-red-500" />
+                            <div className="absolute -top-0 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap">
+                              Now
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               );
             })}
@@ -268,6 +376,8 @@ const GanttChartView: React.FC<GanttChartViewProps> = ({
       </div>
     </div>
   );
-};
+});
+
+GanttChartView.displayName = 'GanttChartView';
 
 export default GanttChartView;
