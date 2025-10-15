@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Task, ZoomLevel, Epic, UserStory } from '../../types';
 import Header from './Header';
 import TaskList from './TaskList';
@@ -89,9 +89,37 @@ const GanttChartMain: React.FC = () => {
   const [editingUserStory, setEditingUserStory] = useState<UserStory | null>(null);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
+  const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
 
   const chartRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
+
+  // Navigate to current day on mount
+  useEffect(() => {
+    // Use a small delay to ensure the DOM is fully rendered
+    const timer = setTimeout(() => {
+      if (!ganttScrollRef.current) return;
+
+      const today = new Date();
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      let todayIndex = 0;
+
+      if (zoomLevel === 'day') {
+        todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+      } else if (zoomLevel === 'week') {
+        todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      } else if (zoomLevel === 'month') {
+        todayIndex = today.getMonth();
+      } else if (zoomLevel === 'quarter') {
+        todayIndex = Math.floor(today.getMonth() / 3);
+      }
+
+      // Calculate scroll position (approximate)
+      const scrollAmount = (todayIndex / (zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4)) * ganttScrollRef.current.scrollWidth;
+      ganttScrollRef.current.scrollTo({ left: scrollAmount - ganttScrollRef.current.clientWidth / 2, behavior: 'smooth' });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array means this runs once on mount
 
   // Filter tasks based on selected epics and user stories
   const getFilteredTasks = () => {
@@ -359,20 +387,38 @@ const GanttChartMain: React.FC = () => {
       {/* Main Content: Task List + Gantt Chart */}
       <div className="flex flex-1 overflow-hidden" ref={chartRef}>
         {/* Task List Sidebar */}
-        <TaskList
-          tasks={tasks}
-          epics={epics}
-          userStories={userStories}
-          onAddTask={handleAddTask}
-          onTaskClick={handleTaskClick}
-          onTaskReorder={handleTaskReorder}
-          onEpicToggle={handleEpicToggle}
-          onUserStoryToggle={handleUserStoryToggle}
-          onAddEpic={handleAddEpic}
-          onAddUserStory={handleAddUserStory}
-          onEpicClick={handleEditEpic}
-          onUserStoryClick={handleEditUserStory}
-        />
+        {!isTaskListCollapsed && (
+          <TaskList
+            tasks={tasks}
+            epics={epics}
+            userStories={userStories}
+            onAddTask={handleAddTask}
+            onTaskClick={handleTaskClick}
+            onTaskReorder={handleTaskReorder}
+            onEpicToggle={handleEpicToggle}
+            onUserStoryToggle={handleUserStoryToggle}
+            onAddEpic={handleAddEpic}
+            onAddUserStory={handleAddUserStory}
+            onEpicClick={handleEditEpic}
+            onUserStoryClick={handleEditUserStory}
+            onToggleCollapse={() => setIsTaskListCollapsed(true)}
+          />
+        )}
+
+        {/* Expand Button when collapsed */}
+        {isTaskListCollapsed && (
+          <div className="flex items-start p-4 bg-white border-r border-gray-200">
+            <button
+              onClick={() => setIsTaskListCollapsed(false)}
+              className="flex items-center justify-center p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Show sidebar"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Gantt Chart View */}
         <GanttChartView

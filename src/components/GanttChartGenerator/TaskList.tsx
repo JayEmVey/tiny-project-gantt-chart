@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, ChevronDown, ChevronRight, ChevronsLeft } from 'lucide-react';
 import { Task, Epic, UserStory } from '../../types';
 
 interface TaskListProps {
@@ -15,6 +15,7 @@ interface TaskListProps {
   onAddUserStory: (epicId: number) => void;
   onEpicClick?: (epic: Epic) => void;
   onUserStoryClick?: (userStory: UserStory) => void;
+  onToggleCollapse?: () => void;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
@@ -29,13 +30,33 @@ const TaskList: React.FC<TaskListProps> = ({
   onAddEpic,
   onAddUserStory,
   onEpicClick,
-  onUserStoryClick
+  onUserStoryClick,
+  onToggleCollapse
 }) => {
-  const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set(epics.map(e => e.id)));
-  const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set(userStories.map(us => us.id)));
+  const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set());
+  const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set());
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(event.target as Node)) {
+        setShowAddMenu(false);
+      }
+    };
+
+    if (showAddMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAddMenu]);
 
   const toggleEpic = (epicId: number) => {
     setExpandedEpics(prev => {
@@ -110,16 +131,60 @@ const TaskList: React.FC<TaskListProps> = ({
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-      {/* New Task Button */}
-      <div className="p-4">
+      {/* Header with Collapse Button */}
+      <div className="flex items-center justify-between p-4 border-b border-gray-200">
         <button
-          onClick={onAddTask}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+          onClick={() => setShowAddMenu(!showAddMenu)}
+          className="flex items-center justify-center p-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
         >
           <Plus className="w-5 h-5" strokeWidth={2} />
-          <span className="font-medium text-lg">New Task</span>
         </button>
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className="flex items-center justify-center p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Hide sidebar"
+          >
+            <ChevronsLeft className="w-5 h-5" strokeWidth={2} />
+          </button>
+        )}
       </div>
+
+      {/* Add Button Dropdown Menu */}
+      {showAddMenu && (
+        <div className="absolute top-20 left-4 right-4 bg-white border-2 border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden" ref={addMenuRef}>
+            <button
+              onClick={() => {
+                onAddTask();
+                setShowAddMenu(false);
+              }}
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-200"
+            >
+              <span className="font-medium">New Task</span>
+            </button>
+            <button
+              onClick={() => {
+                // For now, add to first epic if available
+                if (epics.length > 0) {
+                  onAddUserStory(epics[0].id);
+                }
+                setShowAddMenu(false);
+              }}
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-200"
+            >
+              <span className="font-medium">New User Story</span>
+            </button>
+            <button
+              onClick={() => {
+                onAddEpic();
+                setShowAddMenu(false);
+              }}
+              className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+            >
+              <span className="font-medium">New Epic</span>
+            </button>
+        </div>
+      )}
 
       {/* Hierarchical List: Epics → User Stories → Tasks */}
       <div className="flex-1 overflow-y-auto">
