@@ -1,114 +1,82 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { Task, Epic, UserStory } from '../../types';
+import { UserStory, Epic } from '../../types';
 
-interface TaskModalProps {
+interface UserStoryModalProps {
   isOpen: boolean;
-  task: Task | null;
+  userStory: UserStory | null;
   epics: Epic[];
-  userStories: UserStory[];
   onClose: () => void;
-  onSave: (task: Task) => void;
-  onDelete?: (taskId: number) => void;
+  onSave: (userStory: UserStory) => void;
+  onDelete?: (userStoryId: number) => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({
+const UserStoryModal: React.FC<UserStoryModalProps> = ({
   isOpen,
-  task,
+  userStory,
   epics,
-  userStories,
   onClose,
   onSave,
   onDelete
 }) => {
-  const [formData, setFormData] = useState<Partial<Task>>({
-    process: '',
-    startDate: '',
-    endDate: '',
+  const [formData, setFormData] = useState<Partial<UserStory>>({
+    name: '',
+    epicId: 0,
     assignee: '',
     status: 'not-started',
     priority: 'medium',
     progress: 0,
-    description: '',
-    dependencies: [],
-    epicId: undefined,
-    userStoryId: undefined
+    description: ''
   });
 
   useEffect(() => {
-    if (task) {
-      setFormData(task);
+    if (userStory) {
+      setFormData(userStory);
     } else {
-      // Set default epic and user story if available
-      const defaultEpicId = epics.length > 0 ? epics[0].id : undefined;
-      const defaultUserStoryId = userStories.length > 0 ? userStories[0].id : undefined;
+      // Set default epic to the first one if available
+      const defaultEpicId = epics.length > 0 ? epics[0].id : 0;
       setFormData({
-        process: '',
-        startDate: '',
-        endDate: '',
+        name: '',
+        epicId: defaultEpicId,
         assignee: '',
         status: 'not-started',
         priority: 'medium',
         progress: 0,
-        description: '',
-        dependencies: [],
-        epicId: defaultEpicId,
-        userStoryId: defaultUserStoryId
+        description: ''
       });
     }
-  }, [task, epics, userStories]);
-
-  // Helper function to convert DD/MM/YYYY to YYYY-MM-DD for input fields
-  const toInputFormat = (dateStr: string): string => {
-    if (!dateStr) return '';
-    const [day, month, year] = dateStr.split('/');
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  };
-
-  // Helper function to convert YYYY-MM-DD to DD/MM/YYYY
-  const fromInputFormat = (dateStr: string): string => {
-    if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
-  };
+  }, [userStory, epics]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.process || !formData.startDate || !formData.endDate) {
-      alert('Please fill in all required fields');
+    if (!formData.name) {
+      alert('Please fill in the User Story name');
       return;
     }
     if (!formData.epicId) {
       alert('Please select an Epic');
       return;
     }
-    if (!formData.userStoryId) {
-      alert('Please select a User Story');
-      return;
-    }
 
-    const taskToSave: Task = {
-      id: task?.id || Date.now(),
-      process: formData.process,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
+    const userStoryToSave: UserStory = {
+      id: userStory?.id || Date.now(),
+      name: formData.name,
+      epicId: formData.epicId,
       assignee: formData.assignee || '',
       status: formData.status || 'not-started',
       priority: formData.priority || 'medium',
       progress: formData.progress || 0,
       description: formData.description || '',
-      dependencies: formData.dependencies || [],
-      epicId: formData.epicId,
-      userStoryId: formData.userStoryId
+      isSelected: userStory?.isSelected ?? true
     };
 
-    onSave(taskToSave);
+    onSave(userStoryToSave);
     onClose();
   };
 
   const handleDelete = () => {
-    if (task && onDelete && window.confirm('Are you sure you want to delete this task?')) {
-      onDelete(task.id);
+    if (userStory && onDelete && window.confirm('Are you sure you want to delete this user story?')) {
+      onDelete(userStory.id);
       onClose();
     }
   };
@@ -128,7 +96,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-800">
-            {task ? 'Edit Task' : 'New Task'}
+            {userStory ? 'Edit User Story' : 'New User Story'}
           </h2>
           <button
             onClick={onClose}
@@ -140,15 +108,15 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Task Name */}
+          {/* User Story Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Task Name <span className="text-red-500">*</span>
+              User Story <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={formData.process || ''}
-              onChange={(e) => setFormData({ ...formData, process: e.target.value })}
+              value={formData.name || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             />
@@ -161,13 +129,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
             </label>
             <select
               value={formData.epicId || ''}
-              onChange={(e) => {
-                const epicId = e.target.value ? parseInt(e.target.value) : undefined;
-                // Filter user stories based on selected epic
-                const filteredUserStories = userStories.filter(us => us.epicId === epicId);
-                const newUserStoryId = filteredUserStories.length > 0 ? filteredUserStories[0].id : undefined;
-                setFormData({ ...formData, epicId, userStoryId: newUserStoryId });
-              }}
+              onChange={(e) => setFormData({ ...formData, epicId: parseInt(e.target.value) })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
@@ -178,57 +140,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 </option>
               ))}
             </select>
-          </div>
-
-          {/* User Story Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              User Story <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.userStoryId || ''}
-              onChange={(e) => setFormData({ ...formData, userStoryId: e.target.value ? parseInt(e.target.value) : undefined })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-              disabled={!formData.epicId}
-            >
-              <option value="">Select a User Story</option>
-              {userStories
-                .filter(us => us.epicId === formData.epicId)
-                .map(userStory => (
-                  <option key={userStory.id} value={userStory.id}>
-                    {userStory.name}
-                  </option>
-                ))}
-            </select>
-          </div>
-
-          {/* Date Range */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Start Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={toInputFormat(formData.startDate || '')}
-                onChange={(e) => setFormData({ ...formData, startDate: fromInputFormat(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                End Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={toInputFormat(formData.endDate || '')}
-                onChange={(e) => setFormData({ ...formData, endDate: fromInputFormat(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
           </div>
 
           {/* Assignee */}
@@ -308,7 +219,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           {/* Action Buttons */}
           <div className="flex justify-between pt-4">
             <div>
-              {task && onDelete && (
+              {userStory && onDelete && (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -330,7 +241,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 type="submit"
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
               >
-                {task ? 'Save Changes' : 'Create Task'}
+                {userStory ? 'Save Changes' : 'Create User Story'}
               </button>
             </div>
           </div>
@@ -340,4 +251,4 @@ const TaskModal: React.FC<TaskModalProps> = ({
   );
 };
 
-export default TaskModal;
+export default UserStoryModal;

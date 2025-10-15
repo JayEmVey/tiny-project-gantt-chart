@@ -3,6 +3,8 @@ import { Task, ZoomLevel, Epic, UserStory } from '../../types';
 import Header from './Header';
 import TaskList from './TaskList';
 import TaskModal from './TaskModal';
+import EpicModal from './EpicModal';
+import UserStoryModal from './UserStoryModal';
 import ViewControls from './ViewControls';
 import GanttChartView from './GanttChartView';
 import html2canvas from 'html2canvas';
@@ -81,6 +83,10 @@ const GanttChartMain: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isEpicModalOpen, setIsEpicModalOpen] = useState(false);
+  const [editingEpic, setEditingEpic] = useState<Epic | null>(null);
+  const [isUserStoryModalOpen, setIsUserStoryModalOpen] = useState(false);
+  const [editingUserStory, setEditingUserStory] = useState<UserStory | null>(null);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
 
@@ -265,12 +271,33 @@ const GanttChartMain: React.FC = () => {
 
   // Handle add Epic
   const handleAddEpic = () => {
-    const newEpic: Epic = {
-      id: Date.now(),
-      name: `Epic ${epics.length + 1}`,
-      isSelected: true
-    };
-    setEpics([...epics, newEpic]);
+    setEditingEpic(null);
+    setIsEpicModalOpen(true);
+  };
+
+  // Handle edit Epic
+  const handleEditEpic = (epic: Epic) => {
+    setEditingEpic(epic);
+    setIsEpicModalOpen(true);
+  };
+
+  // Handle save Epic
+  const handleSaveEpic = (epic: Epic) => {
+    if (!epics.find(e => e.id === epic.id)) {
+      // New epic
+      setEpics([...epics, epic]);
+    } else {
+      // Update existing epic
+      setEpics(epics.map(e => e.id === epic.id ? epic : e));
+    }
+  };
+
+  // Handle delete Epic
+  const handleDeleteEpic = (epicId: number) => {
+    // Also delete related user stories and tasks
+    setUserStories(userStories.filter(us => us.epicId !== epicId));
+    setTasks(tasks.filter(t => t.epicId !== epicId));
+    setEpics(epics.filter(e => e.id !== epicId));
   };
 
   // Handle add User Story
@@ -281,7 +308,32 @@ const GanttChartMain: React.FC = () => {
       name: `User Story ${userStories.filter(us => us.epicId === epicId).length + 1}`,
       isSelected: true
     };
-    setUserStories([...userStories, newUserStory]);
+    setEditingUserStory(newUserStory);
+    setIsUserStoryModalOpen(true);
+  };
+
+  // Handle edit User Story
+  const handleEditUserStory = (userStory: UserStory) => {
+    setEditingUserStory(userStory);
+    setIsUserStoryModalOpen(true);
+  };
+
+  // Handle save User Story
+  const handleSaveUserStory = (userStory: UserStory) => {
+    if (!userStories.find(us => us.id === userStory.id)) {
+      // New user story
+      setUserStories([...userStories, userStory]);
+    } else {
+      // Update existing user story
+      setUserStories(userStories.map(us => us.id === userStory.id ? userStory : us));
+    }
+  };
+
+  // Handle delete User Story
+  const handleDeleteUserStory = (userStoryId: number) => {
+    // Also delete related tasks
+    setTasks(tasks.filter(t => t.userStoryId !== userStoryId));
+    setUserStories(userStories.filter(us => us.id !== userStoryId));
   };
 
   return (
@@ -318,6 +370,8 @@ const GanttChartMain: React.FC = () => {
           onUserStoryToggle={handleUserStoryToggle}
           onAddEpic={handleAddEpic}
           onAddUserStory={handleAddUserStory}
+          onEpicClick={handleEditEpic}
+          onUserStoryClick={handleEditUserStory}
         />
 
         {/* Gantt Chart View */}
@@ -336,9 +390,30 @@ const GanttChartMain: React.FC = () => {
       <TaskModal
         isOpen={isModalOpen}
         task={editingTask}
+        epics={epics}
+        userStories={userStories}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
+      />
+
+      {/* Epic Modal */}
+      <EpicModal
+        isOpen={isEpicModalOpen}
+        epic={editingEpic}
+        onClose={() => setIsEpicModalOpen(false)}
+        onSave={handleSaveEpic}
+        onDelete={handleDeleteEpic}
+      />
+
+      {/* User Story Modal */}
+      <UserStoryModal
+        isOpen={isUserStoryModalOpen}
+        userStory={editingUserStory}
+        epics={epics}
+        onClose={() => setIsUserStoryModalOpen(false)}
+        onSave={handleSaveUserStory}
+        onDelete={handleDeleteUserStory}
       />
     </div>
   );

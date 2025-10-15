@@ -13,6 +13,8 @@ interface TaskListProps {
   onUserStoryToggle: (userStoryId: number) => void;
   onAddEpic: () => void;
   onAddUserStory: (epicId: number) => void;
+  onEpicClick?: (epic: Epic) => void;
+  onUserStoryClick?: (userStory: UserStory) => void;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
@@ -25,7 +27,9 @@ const TaskList: React.FC<TaskListProps> = ({
   onEpicToggle,
   onUserStoryToggle,
   onAddEpic,
-  onAddUserStory
+  onAddUserStory,
+  onEpicClick,
+  onUserStoryClick
 }) => {
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set(epics.map(e => e.id)));
   const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set(userStories.map(us => us.id)));
@@ -126,6 +130,12 @@ const TaskList: React.FC<TaskListProps> = ({
               <div
                 className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer"
                 onClick={() => toggleEpic(epic.id)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  if (onEpicClick) {
+                    onEpicClick(epic);
+                  }
+                }}
               >
                 <input
                   type="checkbox"
@@ -162,6 +172,12 @@ const TaskList: React.FC<TaskListProps> = ({
                       <div
                         className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
                         onClick={() => toggleUserStory(userStory.id)}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          if (onUserStoryClick) {
+                            onUserStoryClick(userStory);
+                          }
+                        }}
                       >
                         <input
                           type="checkbox"

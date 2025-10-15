@@ -6,6 +6,10 @@ export interface TaskDependency {
 export interface Epic {
   id: number
   name: string
+  assignee?: string
+  status?: 'not-started' | 'in-progress' | 'completed' | 'overdue'
+  priority?: 'low' | 'medium' | 'high'
+  progress?: number // 0-100
   description?: string
   isSelected: boolean
 }
@@ -14,6 +18,10 @@ export interface UserStory {
   id: number
   epicId: number
   name: string
+  assignee?: string
+  status?: 'not-started' | 'in-progress' | 'completed' | 'overdue'
+  priority?: 'low' | 'medium' | 'high'
+  progress?: number // 0-100
   description?: string
   isSelected: boolean
 }
