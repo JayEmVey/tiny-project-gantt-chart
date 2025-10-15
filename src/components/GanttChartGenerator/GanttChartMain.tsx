@@ -7,6 +7,7 @@ import EpicModal from './EpicModal';
 import UserStoryModal from './UserStoryModal';
 import ViewControls from './ViewControls';
 import GanttChartView from './GanttChartView';
+import { saveProjectToFile, openProjectFile } from '../../utils/projectFileHandler';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './animations.css';
@@ -80,7 +81,7 @@ const GanttChartMain: React.FC = () => {
   const [epics, setEpics] = useState<Epic[]>(getInitialEpics);
   const [userStories, setUserStories] = useState<UserStory[]>(getInitialUserStories);
   const [tasks, setTasks] = useState<Task[]>(getInitialTasks);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [projectName, setProjectName] = useState('My Project');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEpicModalOpen, setIsEpicModalOpen] = useState(false);
@@ -132,19 +133,42 @@ const GanttChartMain: React.FC = () => {
       const userStory = userStories.find(us => us.id === task.userStoryId);
       if (!userStory || !userStory.isSelected) return false;
 
-      // Apply search filter
-      if (searchTerm) {
-        return (
-          task.process.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (task.assignee && task.assignee.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-      }
-
       return true;
     });
   };
 
   const filteredTasks = getFilteredTasks();
+
+  // Handle Save Project
+  const handleSaveProject = () => {
+    try {
+      saveProjectToFile(projectName, epics, userStories, tasks);
+      alert('Project saved successfully!');
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      alert('Failed to save project. Please try again.');
+    }
+  };
+
+  // Handle Open Project
+  const handleOpenProject = async () => {
+    try {
+      const projectData = await openProjectFile();
+
+      // Update state with loaded data
+      setProjectName(projectData.projectName);
+      setEpics(projectData.epics);
+      setUserStories(projectData.userStories);
+      setTasks(projectData.tasks);
+
+      alert('Project loaded successfully!');
+    } catch (error) {
+      if (error instanceof Error && error.message !== 'File selection cancelled') {
+        console.error('Failed to open project:', error);
+        alert('Failed to open project: ' + error.message);
+      }
+    }
+  };
 
   // Handle adding a new task
   const handleAddTask = () => {
@@ -368,9 +392,10 @@ const GanttChartMain: React.FC = () => {
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <Header
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
         onExport={handleExport}
+        onSaveProject={handleSaveProject}
+        onOpenProject={handleOpenProject}
+        projectName={projectName}
       />
 
       {/* View Controls */}
