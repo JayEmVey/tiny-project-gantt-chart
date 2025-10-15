@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Task, ZoomLevel } from '../../types';
+import { Task, ZoomLevel, Epic, UserStory } from '../../types';
 import Header from './Header';
 import TaskList from './TaskList';
 import TaskModal from './TaskModal';
@@ -10,7 +10,24 @@ import jsPDF from 'jspdf';
 import './animations.css';
 
 const GanttChartMain: React.FC = () => {
-  // Initial sample tasks
+  // Initial sample data
+  const getInitialEpics = (): Epic[] => {
+    return [
+      { id: 1, name: 'Epic 1', isSelected: true },
+      { id: 2, name: 'Epic 2', isSelected: false },
+      { id: 3, name: 'Epic 3', isSelected: false }
+    ];
+  };
+
+  const getInitialUserStories = (): UserStory[] => {
+    return [
+      { id: 1, epicId: 1, name: 'User Story 1', isSelected: true },
+      { id: 2, epicId: 1, name: 'User Story 2', isSelected: true },
+      { id: 3, epicId: 2, name: 'User Story 3', isSelected: false },
+      { id: 4, epicId: 3, name: 'User Story 4', isSelected: false }
+    ];
+  };
+
   const getInitialTasks = (): Task[] => {
     return [
       {
@@ -23,7 +40,9 @@ const GanttChartMain: React.FC = () => {
         priority: 'high',
         progress: 100,
         description: 'First task',
-        dependencies: []
+        dependencies: [],
+        epicId: 1,
+        userStoryId: 1
       },
       {
         id: 2,
@@ -35,7 +54,9 @@ const GanttChartMain: React.FC = () => {
         priority: 'medium',
         progress: 60,
         description: 'Second task',
-        dependencies: [1]
+        dependencies: [1],
+        epicId: 1,
+        userStoryId: 1
       },
       {
         id: 3,
@@ -47,11 +68,15 @@ const GanttChartMain: React.FC = () => {
         priority: 'high',
         progress: 0,
         description: 'Third task',
-        dependencies: [2]
+        dependencies: [2],
+        epicId: 1,
+        userStoryId: 2
       }
     ];
   };
 
+  const [epics, setEpics] = useState<Epic[]>(getInitialEpics);
+  const [userStories, setUserStories] = useState<UserStory[]>(getInitialUserStories);
   const [tasks, setTasks] = useState<Task[]>(getInitialTasks);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,11 +87,30 @@ const GanttChartMain: React.FC = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
 
-  // Filter tasks based on search term
-  const filteredTasks = tasks.filter(task =>
-    task.process.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (task.assignee && task.assignee.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // Filter tasks based on selected epics and user stories
+  const getFilteredTasks = () => {
+    return tasks.filter(task => {
+      // Find the epic for this task
+      const epic = epics.find(e => e.id === task.epicId);
+      if (!epic || !epic.isSelected) return false;
+
+      // Find the user story for this task
+      const userStory = userStories.find(us => us.id === task.userStoryId);
+      if (!userStory || !userStory.isSelected) return false;
+
+      // Apply search filter
+      if (searchTerm) {
+        return (
+          task.process.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (task.assignee && task.assignee.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+      }
+
+      return true;
+    });
+  };
+
+  const filteredTasks = getFilteredTasks();
 
   // Handle adding a new task
   const handleAddTask = () => {
@@ -205,6 +249,41 @@ const GanttChartMain: React.FC = () => {
     ganttScrollRef.current.scrollBy({ left: ganttScrollRef.current.clientWidth * 0.5, behavior: 'smooth' });
   };
 
+  // Handle Epic toggle
+  const handleEpicToggle = (epicId: number) => {
+    setEpics(epics.map(epic =>
+      epic.id === epicId ? { ...epic, isSelected: !epic.isSelected } : epic
+    ));
+  };
+
+  // Handle User Story toggle
+  const handleUserStoryToggle = (userStoryId: number) => {
+    setUserStories(userStories.map(us =>
+      us.id === userStoryId ? { ...us, isSelected: !us.isSelected } : us
+    ));
+  };
+
+  // Handle add Epic
+  const handleAddEpic = () => {
+    const newEpic: Epic = {
+      id: Date.now(),
+      name: `Epic ${epics.length + 1}`,
+      isSelected: true
+    };
+    setEpics([...epics, newEpic]);
+  };
+
+  // Handle add User Story
+  const handleAddUserStory = (epicId: number) => {
+    const newUserStory: UserStory = {
+      id: Date.now(),
+      epicId: epicId,
+      name: `User Story ${userStories.filter(us => us.epicId === epicId).length + 1}`,
+      isSelected: true
+    };
+    setUserStories([...userStories, newUserStory]);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
@@ -229,10 +308,16 @@ const GanttChartMain: React.FC = () => {
       <div className="flex flex-1 overflow-hidden" ref={chartRef}>
         {/* Task List Sidebar */}
         <TaskList
-          tasks={filteredTasks}
+          tasks={tasks}
+          epics={epics}
+          userStories={userStories}
           onAddTask={handleAddTask}
           onTaskClick={handleTaskClick}
           onTaskReorder={handleTaskReorder}
+          onEpicToggle={handleEpicToggle}
+          onUserStoryToggle={handleUserStoryToggle}
+          onAddEpic={handleAddEpic}
+          onAddUserStory={handleAddUserStory}
         />
 
         {/* Gantt Chart View */}

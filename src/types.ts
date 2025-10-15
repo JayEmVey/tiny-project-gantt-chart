@@ -3,6 +3,21 @@ export interface TaskDependency {
   type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish'
 }
 
+export interface Epic {
+  id: number
+  name: string
+  description?: string
+  isSelected: boolean
+}
+
+export interface UserStory {
+  id: number
+  epicId: number
+  name: string
+  description?: string
+  isSelected: boolean
+}
+
 export interface Task {
   id: number
   process: string
@@ -15,6 +30,8 @@ export interface Task {
   description?: string
   dependencies?: number[] // IDs of tasks this depends on (for backward compatibility)
   dependenciesV2?: TaskDependency[] // New format with dependency types
+  epicId?: number
+  userStoryId?: number
 }
 
 // Alias for backward compatibility

@@ -1,18 +1,71 @@
 import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { Task } from '../../types';
+import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Task, Epic, UserStory } from '../../types';
 
 interface TaskListProps {
   tasks: Task[];
+  epics: Epic[];
+  userStories: UserStory[];
   onAddTask: () => void;
   onTaskClick: (task: Task) => void;
   onTaskReorder: (fromIndex: number, toIndex: number) => void;
+  onEpicToggle: (epicId: number) => void;
+  onUserStoryToggle: (userStoryId: number) => void;
+  onAddEpic: () => void;
+  onAddUserStory: (epicId: number) => void;
 }
 
-const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onTaskClick, onTaskReorder }) => {
+const TaskList: React.FC<TaskListProps> = ({
+  tasks,
+  epics,
+  userStories,
+  onAddTask,
+  onTaskClick,
+  onTaskReorder,
+  onEpicToggle,
+  onUserStoryToggle,
+  onAddEpic,
+  onAddUserStory
+}) => {
+  const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set(epics.map(e => e.id)));
+  const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set(userStories.map(us => us.id)));
   const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const toggleEpic = (epicId: number) => {
+    setExpandedEpics(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(epicId)) {
+        newSet.delete(epicId);
+      } else {
+        newSet.add(epicId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleUserStory = (userStoryId: number) => {
+    setExpandedUserStories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(userStoryId)) {
+        newSet.delete(userStoryId);
+      } else {
+        newSet.add(userStoryId);
+      }
+      return newSet;
+    });
+  };
+
+  // Get user stories for an epic
+  const getUserStoriesForEpic = (epicId: number) => {
+    return userStories.filter(us => us.epicId === epicId);
+  };
+
+  // Get tasks for a user story
+  const getTasksForUserStory = (userStoryId: number) => {
+    return tasks.filter(task => task.userStoryId === userStoryId);
+  };
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedTaskIndex(index);
@@ -64,59 +117,98 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onTaskClick, onTa
         </button>
       </div>
 
-      {/* Task List */}
+      {/* Hierarchical List: Epics → User Stories → Tasks */}
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-0">
-          {tasks.map((task, index) => (
-            <React.Fragment key={task.id}>
-              {/* Drop indicator line */}
-              {isDragging && dropTargetIndex === index && draggedTaskIndex !== index && (
-                <div className="h-0.5 bg-blue-500 mx-4 relative">
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full -ml-1"></div>
-                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full -mr-1"></div>
+          {epics.map((epic) => (
+            <div key={epic.id} className="border-b border-gray-200">
+              {/* Epic Level */}
+              <div
+                className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                onClick={() => toggleEpic(epic.id)}
+              >
+                <input
+                  type="checkbox"
+                  checked={epic.isSelected}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    onEpicToggle(epic.id);
+                  }}
+                  className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <button
+                  className="ml-2 text-gray-600"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleEpic(epic.id);
+                  }}
+                >
+                  {expandedEpics.has(epic.id) ? (
+                    <ChevronDown className="w-4 h-4" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4" />
+                  )}
+                </button>
+                <span className="ml-2 font-bold text-gray-800">{epic.name}</span>
+              </div>
+
+              {/* User Stories under Epic */}
+              {expandedEpics.has(epic.id) && (
+                <div className="ml-6">
+                  {getUserStoriesForEpic(epic.id).map((userStory) => (
+                    <div key={userStory.id}>
+                      {/* User Story Level */}
+                      <div
+                        className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => toggleUserStory(userStory.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={userStory.isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            onUserStoryToggle(userStory.id);
+                          }}
+                          className="w-4 h-4 border-2 border-gray-300 rounded cursor-pointer"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                          className="ml-2 text-gray-600"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleUserStory(userStory.id);
+                          }}
+                        >
+                          {expandedUserStories.has(userStory.id) ? (
+                            <ChevronDown className="w-3 h-3" />
+                          ) : (
+                            <ChevronRight className="w-3 h-3" />
+                          )}
+                        </button>
+                        <span className="ml-2 font-medium text-gray-700">{userStory.name}</span>
+                      </div>
+
+                      {/* Tasks under User Story */}
+                      {expandedUserStories.has(userStory.id) && (
+                        <div className="ml-6">
+                          {getTasksForUserStory(userStory.id).map((task) => (
+                            <div
+                              key={task.id}
+                              onClick={() => onTaskClick(task)}
+                              className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <span className="ml-6 text-sm text-gray-600">{task.process}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
-
-              <div
-                draggable
-                onDragStart={(e) => handleDragStart(e, index)}
-                onDragEnd={handleDragEnd}
-                onDragOver={(e) => handleDragOver(e, index)}
-                onDragLeave={handleDragLeave}
-                onClick={() => onTaskClick(task)}
-                className={`
-                  px-4 py-3 border-b border-gray-100 cursor-move hover:bg-gray-50 transition-all duration-300
-                  ${draggedTaskIndex === index ? 'opacity-50' : 'opacity-100'}
-                  ${dropTargetIndex === index && draggedTaskIndex !== index ? 'bg-blue-50' : ''}
-                `}
-                style={{
-                  transition: 'all 0.3s ease-in-out'
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={task.status === 'completed'}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      // Handle checkbox change
-                    }}
-                    className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  <span className="text-gray-700 font-medium">{task.process}</span>
-                </div>
-              </div>
-            </React.Fragment>
-          ))}
-
-          {/* Drop indicator at the end */}
-          {isDragging && dropTargetIndex === tasks.length && (
-            <div className="h-0.5 bg-blue-500 mx-4 relative">
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full -ml-1"></div>
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-500 rounded-full -mr-1"></div>
             </div>
-          )}
+          ))}
         </div>
       </div>
     </div>
