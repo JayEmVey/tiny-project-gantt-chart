@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect, forwardRef } from 'react';
-import { Task, ZoomLevel, Epic, Milestone } from '../../types';
+import { Task, ZoomLevel, Epic, Milestone, ViewType, UserStory } from '../../types';
 import { calculateEpicDates } from '../../utils/epicDateCalculator';
 
 interface GanttChartViewProps {
   tasks: Task[];
   epics: Epic[];
+  userStories?: UserStory[];
   milestones: Milestone[];
   zoomLevel: ZoomLevel;
+  viewType?: ViewType;
   onTaskClick: (task: Task) => void;
   onEpicClick?: (epic: Epic) => void;
   onEmptyCellClick: (date: Date, taskIndex?: number) => void;
@@ -26,8 +28,10 @@ interface BarPosition {
 const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   tasks,
   epics,
+  userStories = [],
   milestones,
   zoomLevel,
+  viewType = 'task',
   onTaskClick,
   onEpicClick,
   onEmptyCellClick,
@@ -322,18 +326,76 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   };
 
   // Prepare Epic data with calculated dates
-  const epicsWithDates = epics.map(epic => {
-    const dates = calculateEpicDates(epic.id, tasks);
-    return {
-      ...epic,
-      startDate: dates?.startDate,
-      endDate: dates?.endDate
-    };
-  }).filter(epic => epic.startDate && epic.endDate); // Only show epics with tasks
+  const epicsWithDates = epics
+    .filter(epic => epic.isSelected) // Only show selected epics
+    .map(epic => {
+      const dates = calculateEpicDates(epic.id, tasks);
+      return {
+        ...epic,
+        startDate: dates?.startDate,
+        endDate: dates?.endDate
+      };
+    })
+    .filter(epic => epic.startDate && epic.endDate); // Only show epics with tasks
 
-  // Determine what to display based on zoom level
-  const shouldShowEpics = zoomLevel === 'month' || zoomLevel === 'quarter';
-  // const itemsToDisplay = shouldShowEpics ? epicsWithDates : tasks; // not used in current rendering path
+  // Prepare User Story data with calculated dates
+  const userStoriesWithDates = userStories
+    .filter(userStory => userStory.isSelected) // Only show selected user stories
+    .map(userStory => {
+      const userStoryTasks = tasks.filter(task => task.userStoryId === userStory.id);
+      if (userStoryTasks.length === 0) return null;
+
+      const dates = userStoryTasks.reduce((acc, task) => {
+        const taskStart = new Date(task.startDate.split('/').reverse().join('-'));
+        const taskEnd = new Date(task.endDate.split('/').reverse().join('-'));
+
+        if (!acc.startDate || taskStart < new Date(acc.startDate.split('/').reverse().join('-'))) {
+          acc.startDate = task.startDate;
+        }
+        if (!acc.endDate || taskEnd > new Date(acc.endDate.split('/').reverse().join('-'))) {
+          acc.endDate = task.endDate;
+        }
+        return acc;
+      }, { startDate: '', endDate: '' });
+
+      return {
+        ...userStory,
+        startDate: dates.startDate,
+        endDate: dates.endDate
+      };
+    })
+    .filter((us): us is UserStory & { startDate: string; endDate: string } =>
+      us !== null && !!us.startDate && !!us.endDate
+    );
+
+  // Filter tasks based on parent epic/user story selection
+  const getVisibleTasks = () => {
+    return tasks.filter(task => {
+      // If task has a user story, check if that user story is selected
+      if (task.userStoryId) {
+        const userStory = userStories.find(us => us.id === task.userStoryId);
+        if (userStory && !userStory.isSelected) {
+          return false;
+        }
+      }
+
+      // If task has an epic, check if that epic is selected
+      if (task.epicId) {
+        const epic = epics.find(e => e.id === task.epicId);
+        if (epic && !epic.isSelected) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  };
+
+  const visibleTasks = getVisibleTasks();
+
+  // Determine what to display based on view type
+  const shouldShowEpics = viewType === 'epic';
+  const shouldShowUserStories = viewType === 'user-story';
 
   const handleCellClick = (e: React.MouseEvent, columnIndex: number, taskIndex: number) => {
     e.stopPropagation(); // Prevent the chart click from firing
@@ -689,7 +751,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {zoomLevel === 'day' && (
               <tr>
                 <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
-                  {shouldShowEpics ? 'Epic' : 'Task'}
+                  {shouldShowEpics ? 'Epic' : shouldShowUserStories ? 'User Story' : 'Task'}
                 </th>
                 {timeColumns.map((column: any, idx) => (
                   <th
@@ -711,7 +773,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {zoomLevel === 'week' && (
               <tr>
                 <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
-                  {shouldShowEpics ? 'Epic' : 'Task'}
+                  {shouldShowEpics ? 'Epic' : shouldShowUserStories ? 'User Story' : 'Task'}
                 </th>
                 {timeColumns.map((column, idx) => (
                   <th
@@ -728,7 +790,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {(zoomLevel === 'month' || zoomLevel === 'quarter') && (
               <tr>
                 <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
-                  {shouldShowEpics ? 'Epic' : 'Task'}
+                  {shouldShowEpics ? 'Epic' : shouldShowUserStories ? 'User Story' : 'Task'}
                 </th>
                 {timeColumns.map((column, idx) => (
                   <th
@@ -743,7 +805,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
           </thead>
           <tbody>
             {shouldShowEpics ? (
-              // Render Epics in Month/Quarter view
+              // Render Epics
               epicsWithDates.map((epic, epicIndex) => {
                 const barPosition = epic.startDate && epic.endDate ? calculateBarPosition(epic.startDate, epic.endDate) : null;
                 const colorClass = getEpicColor(epic);
@@ -753,7 +815,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                     <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 bg-pink-500 rounded flex-shrink-0" />
+                          <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#9A4D99' }} />
                           <span className="truncate">{epic.name}</span>
                         </div>
                         {epic.assignee && (
@@ -863,9 +925,144 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                   </tr>
                 );
               })
+            ) : shouldShowUserStories ? (
+              // Render User Stories
+              userStoriesWithDates.map((userStory, userStoryIndex) => {
+                const barPosition = userStory.startDate && userStory.endDate ? calculateBarPosition(userStory.startDate, userStory.endDate) : null;
+                // Use inline styles for default color to match PANTONE Forest Green
+                const getBarStyle = () => {
+                  const baseStyle = { backgroundColor: '#00694C' };
+                  if (userStory.status === 'completed') return { backgroundColor: '#22c55e' };
+                  if (userStory.status === 'in-progress') return { backgroundColor: '#eab308' };
+                  if (userStory.status === 'overdue') return { backgroundColor: '#ef4444' };
+                  return baseStyle;
+                };
+
+                return (
+                  <tr key={userStory.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#00694C' }} />
+                          <span className="truncate">{userStory.name}</span>
+                        </div>
+                        {userStory.assignee && (
+                          <span className="text-xs text-gray-500 ml-6">{userStory.assignee}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>
+                      <div className="relative w-full h-16" style={{ display: 'flex' }}>
+                        {timeColumns.map((_column, colIdx) => (
+                          <div
+                            key={colIdx}
+                            className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
+                            onClick={(e) => handleCellClick(e, colIdx, userStoryIndex)}
+                            style={{ minWidth: '48px', height: '64px', flexGrow: 1 }}
+                          />
+                        ))}
+                        {/* Render user story bar as overlay */}
+                        {barPosition && (
+                          <div
+                            className="absolute top-1/2 transform -translate-y-1/2 rounded-lg shadow cursor-pointer transition-all duration-300 hover:shadow-lg"
+                            style={{
+                              ...getBarStyle(),
+                              left: barPosition.left,
+                              width: barPosition.width,
+                              height: '32px',
+                              zIndex: 5
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Could add onUserStoryClick handler here if needed
+                            }}
+                          >
+                            {/* Progress indicator */}
+                            {userStory.progress !== undefined && userStory.progress > 0 && (
+                              <div
+                                className="absolute left-0 top-0 bottom-0 bg-black bg-opacity-20 rounded-l-lg"
+                                style={{ width: `${userStory.progress}%` }}
+                              />
+                            )}
+                          </div>
+                        )}
+                        {/* Today marker for first row */}
+                        {userStoryIndex === 0 && todayPosition !== null && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${todayPosition}%`,
+                              top: '-100vh',
+                              bottom: '-100vh',
+                              zIndex: 20
+                            }}
+                          >
+                            <div className="relative h-full">
+                              <div className="absolute w-0.5 h-full bg-red-500" />
+                              <div className="absolute -top-0 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap">
+                                Now
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {/* Milestone preview line for first row */}
+                        {userStoryIndex === 0 && milestonePreviewPosition !== null && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${milestonePreviewPosition}%`,
+                              top: '-100vh',
+                              bottom: '-100vh',
+                              zIndex: 19
+                            }}
+                          >
+                            <div className="relative h-full">
+                              <div className="absolute w-0.5 h-full bg-gray-400 opacity-50" />
+                            </div>
+                          </div>
+                        )}
+                        {/* Milestones for first row - only vertical lines */}
+                        {userStoryIndex === 0 && milestones.map((milestone) => {
+                          const position = getMilestonePosition(milestone.date);
+                          if (position === null) return null;
+                          const isDragging = draggedMilestone?.milestone.id === milestone.id;
+                          return (
+                            <div
+                              key={milestone.id}
+                              className="absolute pointer-events-auto cursor-move"
+                              style={{
+                                left: `${isDragging ? draggedMilestone.originalPosition : position}%`,
+                                top: '-100vh',
+                                bottom: '-100vh',
+                                zIndex: isDragging ? 30 : 25,
+                                transform: 'translateX(-50%)'
+                              }}
+                              onMouseDown={(e) => handleMilestoneMouseDown(e, milestone)}
+                            >
+                              <div className="relative h-full">
+                                <div className={`absolute w-1 h-full ${isDragging ? 'bg-blue-500' : ''}`} style={{ backgroundColor: milestone.color || '#3b82f6' }} />
+                                <div
+                                  className="absolute -top-0 left-1/2 transform -translate-x-1/2 text-white text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap cursor-pointer hover:opacity-80"
+                                  style={{ backgroundColor: milestone.color || '#3b82f6' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onMilestoneClick(milestone);
+                                  }}
+                                >
+                                  {milestone.name}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
-              // Render Tasks in Day/Week view
-              tasks.map((task, taskIndex) => {
+              // Render Tasks
+              visibleTasks.map((task, taskIndex) => {
                 const barPosition = calculateBarPosition(task.startDate, task.endDate);
                 const colorClass = getTaskColor(task);
                 const isDraggingOver = dropTargetRowIndex === taskIndex;
@@ -892,7 +1089,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                         )}
                         <div className="flex flex-col gap-1 flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <div className="w-3.5 h-3.5 bg-blue-600 rounded flex-shrink-0" />
+                            <div className="w-3.5 h-3.5 rounded flex-shrink-0" style={{ backgroundColor: '#0085CA' }} />
                             <span className="truncate">{task.process}</span>
                           </div>
                           {task.assignee && (

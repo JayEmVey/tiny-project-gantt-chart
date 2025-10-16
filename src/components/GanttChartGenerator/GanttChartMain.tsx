@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Task, ZoomLevel, Epic, UserStory, Milestone } from '../../types';
+import { Task, ZoomLevel, Epic, UserStory, Milestone, ViewType } from '../../types';
 import Header from './Header';
 import TaskList from './TaskList';
 import TaskModal from './TaskModal';
@@ -95,6 +95,7 @@ const GanttChartMain: React.FC = () => {
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
+  const [viewType, setViewType] = useState<ViewType>('task');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
 
@@ -426,6 +427,15 @@ const GanttChartMain: React.FC = () => {
     ));
   };
 
+  // Handle toggle all epics
+  const handleToggleAllEpics = (selectAll: boolean) => {
+    // Update all epics
+    setEpics(epics.map(e => ({ ...e, isSelected: selectAll })));
+
+    // Update all user stories to match
+    setUserStories(userStories.map(us => ({ ...us, isSelected: selectAll })));
+  };
+
   // Handle User Story toggle
   const handleUserStoryToggle = (userStoryId: number) => {
     setUserStories(userStories.map(us =>
@@ -619,6 +629,8 @@ const GanttChartMain: React.FC = () => {
       <ViewControls
         zoomLevel={zoomLevel}
         onZoomChange={setZoomLevel}
+        viewType={viewType}
+        onViewTypeChange={setViewType}
         showCriticalPath={showCriticalPath}
         onToggleCriticalPath={setShowCriticalPath}
         onNavigateLeft={handleNavigateLeft}
@@ -646,6 +658,7 @@ const GanttChartMain: React.FC = () => {
             onToggleCollapse={() => setIsTaskListCollapsed(true)}
             onCloneEpic={handleCloneEpic}
             onDeleteEpic={handleDeleteEpic}
+            onToggleAllEpics={handleToggleAllEpics}
           />
         )}
 
@@ -669,8 +682,10 @@ const GanttChartMain: React.FC = () => {
           ref={ganttScrollRef}
           tasks={tasks}
           epics={epics}
+          userStories={userStories}
           milestones={milestones}
           zoomLevel={zoomLevel}
+          viewType={viewType}
           onTaskClick={handleTaskClick}
           onEpicClick={handleEditEpic}
           onEmptyCellClick={handleEmptyCellClick}

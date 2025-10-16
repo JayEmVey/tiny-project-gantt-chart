@@ -18,6 +18,7 @@ interface TaskListProps {
   onToggleCollapse?: () => void;
   onCloneEpic?: (epicId: number) => void;
   onDeleteEpic?: (epicId: number) => void;
+  onToggleAllEpics?: (selectAll: boolean) => void;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
@@ -35,7 +36,8 @@ const TaskList: React.FC<TaskListProps> = ({
   onUserStoryClick,
   onToggleCollapse,
   onCloneEpic,
-  onDeleteEpic
+  onDeleteEpic,
+  onToggleAllEpics
 }) => {
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set());
   const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set());
@@ -92,21 +94,26 @@ const TaskList: React.FC<TaskListProps> = ({
   };
 
   const handleCheckUncheckAll = () => {
-    // Toggle all epics
-    if (allEpicsSelected) {
-      // Uncheck all
-      epics.forEach(epic => {
-        if (epic.isSelected) {
-          onEpicToggle(epic.id);
-        }
-      });
+    // Use the bulk toggle if available, otherwise fall back to individual toggles
+    if (onToggleAllEpics) {
+      onToggleAllEpics(!allEpicsSelected);
     } else {
-      // Check all
-      epics.forEach(epic => {
-        if (!epic.isSelected) {
-          onEpicToggle(epic.id);
-        }
-      });
+      // Fallback: Toggle all epics individually
+      if (allEpicsSelected) {
+        // Uncheck all
+        epics.forEach(epic => {
+          if (epic.isSelected) {
+            onEpicToggle(epic.id);
+          }
+        });
+      } else {
+        // Check all
+        epics.forEach(epic => {
+          if (!epic.isSelected) {
+            onEpicToggle(epic.id);
+          }
+        });
+      }
     }
   };
 
@@ -201,7 +208,7 @@ const TaskList: React.FC<TaskListProps> = ({
               type="checkbox"
               checked={allEpicsSelected}
               onChange={handleCheckUncheckAll}
-              className="w-4 h-4 border-2 border-gray-300 rounded cursor-pointer"
+              className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer"
             />
             <span className="text-sm text-gray-600">Check/Uncheck All</span>
           </div>
@@ -284,7 +291,7 @@ const TaskList: React.FC<TaskListProps> = ({
                   )}
                 </button>
                 <div className="ml-2 flex items-center gap-2">
-                  <div className="w-4 h-4 bg-pink-500 rounded flex-shrink-0" />
+                  <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#9A4D99' }} />
                   <span className="font-bold text-gray-800">{epic.name}</span>
                 </div>
               </div>
@@ -329,11 +336,7 @@ const TaskList: React.FC<TaskListProps> = ({
                           )}
                         </button>
                         <div className="ml-2 flex items-center gap-2">
-                          <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center flex-shrink-0">
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
+                          <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#00694C' }} />
                           <span className="font-medium text-gray-700">{userStory.name}</span>
                         </div>
                       </div>
@@ -348,7 +351,7 @@ const TaskList: React.FC<TaskListProps> = ({
                               className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
                             >
                               <div className="ml-6 flex items-center gap-2">
-                                <div className="w-3.5 h-3.5 bg-blue-600 rounded flex-shrink-0" />
+                                <div className="w-3.5 h-3.5 rounded flex-shrink-0" style={{ backgroundColor: '#0085CA' }} />
                                 <span className="text-sm text-gray-600">{task.process}</span>
                               </div>
                             </div>

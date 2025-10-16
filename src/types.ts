@@ -71,6 +71,8 @@ export interface BarPosition {
 
 export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter'
 
+export type ViewType = 'task' | 'user-story' | 'epic'
+
 export interface Dependency {
   fromTaskId: number
   toTaskId: number

@@ -1,10 +1,12 @@
 import React from 'react';
-import { ZoomLevel } from '../../types';
+import { ZoomLevel, ViewType } from '../../types';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ViewControlsProps {
   zoomLevel: ZoomLevel;
   onZoomChange: (level: ZoomLevel) => void;
+  viewType: ViewType;
+  onViewTypeChange: (type: ViewType) => void;
   showCriticalPath: boolean;
   onToggleCriticalPath: (show: boolean) => void;
   onNavigateLeft?: () => void;
@@ -15,6 +17,8 @@ interface ViewControlsProps {
 const ViewControls: React.FC<ViewControlsProps> = ({
   zoomLevel,
   onZoomChange,
+  viewType,
+  onViewTypeChange,
   showCriticalPath,
   onToggleCriticalPath,
   onNavigateLeft,
@@ -22,12 +26,35 @@ const ViewControls: React.FC<ViewControlsProps> = ({
   onNavigateToToday
 }) => {
   const zoomLevels: ZoomLevel[] = ['day', 'week', 'month', 'quarter'];
+  const viewTypes: ViewType[] = ['task', 'user-story', 'epic'];
+
+  const formatViewType = (type: ViewType): string => {
+    if (type === 'user-story') return 'User Story';
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  };
 
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* View Mode Selector - Segmented Control */}
-        <div className="flex items-center gap-2">
+        {/* Left side controls */}
+        <div className="flex items-center gap-4">
+          {/* View Type Selector */}
+          <div className="flex items-center gap-2">
+            <label className="text-gray-700 font-medium text-sm">View:</label>
+            <select
+              value={viewType}
+              onChange={(e) => onViewTypeChange(e.target.value as ViewType)}
+              className="px-4 py-2 border-2 border-gray-800 rounded-lg font-medium cursor-pointer hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-1"
+            >
+              {viewTypes.map((type) => (
+                <option key={type} value={type}>
+                  {formatViewType(type)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* View Mode Selector - Segmented Control */}
           <div className="inline-flex border-2 border-gray-800 rounded-lg overflow-hidden">
             {zoomLevels.map((level) => (
               <button
