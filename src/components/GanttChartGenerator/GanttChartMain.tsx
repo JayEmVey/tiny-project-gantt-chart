@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Task, ZoomLevel, Epic, UserStory } from '../../types';
+import { Task, ZoomLevel, Epic, UserStory, Milestone } from '../../types';
 import Header from './Header';
 import TaskList from './TaskList';
 import TaskModal from './TaskModal';
 import EpicModal from './EpicModal';
 import UserStoryModal from './UserStoryModal';
+import MilestoneModal from './MilestoneModal';
+import ExportModal, { ExportOptions } from './ExportModal';
 import ViewControls from './ViewControls';
 import GanttChartView from './GanttChartView';
 import { saveProjectToFile, openProjectFile } from '../../utils/projectFileHandler';
@@ -81,6 +83,7 @@ const GanttChartMain: React.FC = () => {
   const [epics, setEpics] = useState<Epic[]>(getInitialEpics);
   const [userStories, setUserStories] = useState<UserStory[]>(getInitialUserStories);
   const [tasks, setTasks] = useState<Task[]>(getInitialTasks);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [projectName, setProjectName] = useState('My Project');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -88,12 +91,17 @@ const GanttChartMain: React.FC = () => {
   const [editingEpic, setEditingEpic] = useState<Epic | null>(null);
   const [isUserStoryModalOpen, setIsUserStoryModalOpen] = useState(false);
   const [editingUserStory, setEditingUserStory] = useState<UserStory | null>(null);
+  const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
 
   const chartRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedState, setLastSavedState] = useState<string>('');
 
   // Navigate to current day on mount
   useEffect(() => {
@@ -115,12 +123,37 @@ const GanttChartMain: React.FC = () => {
         todayIndex = Math.floor(today.getMonth() / 3);
       }
 
-      // Calculate scroll position (approximate)
-      const scrollAmount = (todayIndex / (zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4)) * ganttScrollRef.current.scrollWidth;
+      // Calculate scroll position to center today
+      const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4;
+      const scrollAmount = (todayIndex / totalColumns) * ganttScrollRef.current.scrollWidth;
       ganttScrollRef.current.scrollTo({ left: scrollAmount - ganttScrollRef.current.clientWidth / 2, behavior: 'smooth' });
     }, 500);
     return () => clearTimeout(timer);
   }, []); // Empty dependency array means this runs once on mount
+
+  // Track changes to project data
+  useEffect(() => {
+    const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
+    if (lastSavedState === '') {
+      // Initialize the saved state on first render
+      setLastSavedState(currentState);
+    } else if (currentState !== lastSavedState) {
+      setHasUnsavedChanges(true);
+    }
+  }, [projectName, epics, userStories, tasks, milestones, lastSavedState]);
+
+  // Add keyboard shortcut for save (Ctrl+S / Cmd+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSaveProject();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [projectName, epics, userStories, tasks, milestones]);
 
   // Filter tasks based on selected epics and user stories
   const getFilteredTasks = () => {
@@ -151,6 +184,7 @@ const GanttChartMain: React.FC = () => {
       setEpics([]);
       setUserStories([]);
       setTasks([]);
+      setMilestones([]);
       setZoomLevel('day');
       setShowCriticalPath(false);
       setIsTaskListCollapsed(false);
@@ -162,7 +196,10 @@ const GanttChartMain: React.FC = () => {
   // Handle Save Project
   const handleSaveProject = () => {
     try {
-      saveProjectToFile(projectName, epics, userStories, tasks);
+      saveProjectToFile(projectName, epics, userStories, tasks, milestones);
+      const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
+      setLastSavedState(currentState);
+      setHasUnsavedChanges(false);
       alert('Project saved successfully!');
     } catch (error) {
       console.error('Failed to save project:', error);
@@ -180,6 +217,18 @@ const GanttChartMain: React.FC = () => {
       setEpics(projectData.epics);
       setUserStories(projectData.userStories);
       setTasks(projectData.tasks);
+      setMilestones(projectData.milestones || []);
+
+      // Reset saved state
+      const currentState = JSON.stringify({
+        projectName: projectData.projectName,
+        epics: projectData.epics,
+        userStories: projectData.userStories,
+        tasks: projectData.tasks,
+        milestones: projectData.milestones || []
+      });
+      setLastSavedState(currentState);
+      setHasUnsavedChanges(false);
 
       alert('Project loaded successfully!');
     } catch (error) {
@@ -263,29 +312,73 @@ const GanttChartMain: React.FC = () => {
     ));
   };
 
-  // Handle export to PDF
-  const handleExport = async () => {
+  // Handle opening export modal
+  const handleExportClick = () => {
+    setIsExportModalOpen(true);
+  };
+
+  // Handle export with options
+  const handleExportWithOptions = async (options: ExportOptions) => {
     if (!chartRef.current) return;
 
     try {
+      // Temporarily change zoom level if different from current
+      const originalZoomLevel = zoomLevel;
+      if (options.viewMode !== zoomLevel) {
+        setZoomLevel(options.viewMode);
+        // Wait for the DOM to update
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      // Determine scale based on option
+      let canvasScale = 2;
+      if (options.scale === 'zoom-in') {
+        canvasScale = 3; // 150% of normal (2 * 1.5)
+      } else if (options.scale === 'zoom-out') {
+        canvasScale = 1.5; // 75% of normal (2 * 0.75)
+      } else if (options.scale === 'actual') {
+        canvasScale = 1;
+      } else if (options.scale === 'fit') {
+        canvasScale = 2;
+      }
+
       const canvas = await html2canvas(chartRef.current, {
-        scale: 2,
+        scale: canvasScale,
         logging: false,
         useCORS: true
       });
 
       const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
-      });
 
-      const imgWidth = 297; // A4 landscape width in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      if (options.fileType === 'image') {
+        // Download as PNG
+        const link = document.createElement('a');
+        link.href = imgData;
+        link.download = `${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_gantt_chart.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Download as PDF
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'mm',
+          format: 'a4'
+        });
 
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-      pdf.save('gantt-chart.pdf');
+        const imgWidth = 297; // A4 landscape width in mm
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+        pdf.save(`${projectName.replace(/[^a-zA-Z0-9]/g, '_')}_gantt_chart.pdf`);
+      }
+
+      // Restore original zoom level if changed
+      if (options.viewMode !== originalZoomLevel) {
+        setZoomLevel(originalZoomLevel);
+      }
+
+      alert('Chart exported successfully!');
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export chart. Please try again.');
@@ -310,8 +403,9 @@ const GanttChartMain: React.FC = () => {
       todayIndex = Math.floor(today.getMonth() / 3);
     }
 
-    // Calculate scroll position (approximate)
-    const scrollAmount = (todayIndex / (zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4)) * ganttScrollRef.current.scrollWidth;
+    // Calculate scroll position to center today
+    const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4;
+    const scrollAmount = (todayIndex / totalColumns) * ganttScrollRef.current.scrollWidth;
     ganttScrollRef.current.scrollTo({ left: scrollAmount - ganttScrollRef.current.clientWidth / 2, behavior: 'smooth' });
   };
 
@@ -474,16 +568,64 @@ const GanttChartMain: React.FC = () => {
     setUserStories(userStories.filter(us => us.id !== userStoryId));
   };
 
+  // Handle milestone creation from chart click
+  const handleMilestoneCreate = (date: string) => {
+    const newMilestone: Milestone = {
+      id: 0,
+      name: '',
+      date: date,
+      color: '#10b981'
+    };
+    setEditingMilestone(newMilestone);
+    setIsMilestoneModalOpen(true);
+  };
+
+  // Handle milestone click
+  const handleMilestoneClick = (milestone: Milestone) => {
+    setEditingMilestone(milestone);
+    setIsMilestoneModalOpen(true);
+  };
+
+  // Handle milestone drag update (save directly without modal)
+  const handleMilestoneDragUpdate = (milestone: Milestone) => {
+    if (!milestones.find(m => m.id === milestone.id)) {
+      // New milestone (shouldn't happen in drag, but handle it)
+      const newMilestone = { ...milestone, id: Date.now() };
+      setMilestones([...milestones, newMilestone]);
+    } else {
+      // Update existing milestone
+      setMilestones(milestones.map(m => m.id === milestone.id ? milestone : m));
+    }
+  };
+
+  // Handle save milestone
+  const handleSaveMilestone = (milestone: Milestone) => {
+    if (milestone.id === 0 || !milestones.find(m => m.id === milestone.id)) {
+      // New milestone
+      const newMilestone = { ...milestone, id: Date.now() };
+      setMilestones([...milestones, newMilestone]);
+    } else {
+      // Update existing milestone
+      setMilestones(milestones.map(m => m.id === milestone.id ? milestone : m));
+    }
+  };
+
+  // Handle delete milestone
+  const handleDeleteMilestone = (milestoneId: number) => {
+    setMilestones(milestones.filter(m => m.id !== milestoneId));
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <Header
-        onExport={handleExport}
+        onExport={handleExportClick}
         onSaveProject={handleSaveProject}
         onOpenProject={handleOpenProject}
         onNewProject={handleNewProject}
         projectName={projectName}
         onProjectNameChange={setProjectName}
+        hasUnsavedChanges={hasUnsavedChanges}
       />
 
       {/* View Controls */}
@@ -540,11 +682,15 @@ const GanttChartMain: React.FC = () => {
           ref={ganttScrollRef}
           tasks={tasks}
           epics={epics}
+          milestones={milestones}
           zoomLevel={zoomLevel}
           onTaskClick={handleTaskClick}
           onEpicClick={handleEditEpic}
           onEmptyCellClick={handleEmptyCellClick}
           onTaskDragInChart={handleTaskDragInChart}
+          onMilestoneCreate={handleMilestoneCreate}
+          onMilestoneClick={handleMilestoneClick}
+          onMilestoneDragUpdate={handleMilestoneDragUpdate}
           showCriticalPath={showCriticalPath}
         />
       </div>
@@ -577,6 +723,23 @@ const GanttChartMain: React.FC = () => {
         onClose={() => setIsUserStoryModalOpen(false)}
         onSave={handleSaveUserStory}
         onDelete={handleDeleteUserStory}
+      />
+
+      {/* Milestone Modal */}
+      <MilestoneModal
+        isOpen={isMilestoneModalOpen}
+        milestone={editingMilestone}
+        onClose={() => setIsMilestoneModalOpen(false)}
+        onSave={handleSaveMilestone}
+        onDelete={handleDeleteMilestone}
+      />
+
+      {/* Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onExport={handleExportWithOptions}
+        currentZoomLevel={zoomLevel}
       />
     </div>
   );

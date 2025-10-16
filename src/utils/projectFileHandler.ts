@@ -1,4 +1,4 @@
-import { Task, Epic, UserStory } from '../types';
+import { Task, Epic, UserStory, Milestone } from '../types';
 
 export interface ProjectData {
   version: string;
@@ -8,6 +8,7 @@ export interface ProjectData {
   epics: Epic[];
   userStories: UserStory[];
   tasks: Task[];
+  milestones: Milestone[];
 }
 
 /**
@@ -17,7 +18,8 @@ export const saveProjectToFile = (
   projectName: string,
   epics: Epic[],
   userStories: UserStory[],
-  tasks: Task[]
+  tasks: Task[],
+  milestones: Milestone[]
 ): void => {
   const projectData: ProjectData = {
     version: '1.0.0',
@@ -26,7 +28,8 @@ export const saveProjectToFile = (
     lastModified: new Date().toISOString(),
     epics,
     userStories,
-    tasks
+    tasks,
+    milestones
   };
 
   // Convert to JSON
@@ -35,12 +38,14 @@ export const saveProjectToFile = (
   // Create a blob
   const blob = new Blob([jsonString], { type: 'application/json' });
 
-  // Generate filename with format: projectname_YYYYMMDD.tgc
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  const dateStr = `${year}${month}${day}`;
+  // Generate filename with format: projectname_YYYYMMDD-HHMM.tgc
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const dateTimeStr = `${year}${month}${day}-${hours}${minutes}`;
 
   // Clean project name (remove special characters, replace spaces with underscores)
   const cleanProjectName = (projectName || 'project')
@@ -48,7 +53,7 @@ export const saveProjectToFile = (
     .replace(/\s+/g, '_')
     .toLowerCase();
 
-  const filename = `${cleanProjectName}_${dateStr}.tgc`;
+  const filename = `${cleanProjectName}_${dateTimeStr}.tgc`;
 
   // Create download link
   const url = URL.createObjectURL(blob);
@@ -93,6 +98,11 @@ export const openProjectFile = (): Promise<ProjectData> => {
           throw new Error('Invalid project file format');
         }
 
+        // Ensure milestones exists (for backward compatibility with older files)
+        if (!projectData.milestones) {
+          projectData.milestones = [];
+        }
+
         // Update last modified
         projectData.lastModified = new Date().toISOString();
 
@@ -122,6 +132,7 @@ export const validateProjectData = (data: any): data is ProjectData => {
     typeof data.projectName === 'string' &&
     Array.isArray(data.epics) &&
     Array.isArray(data.userStories) &&
-    Array.isArray(data.tasks)
+    Array.isArray(data.tasks) &&
+    Array.isArray(data.milestones)
   );
 };

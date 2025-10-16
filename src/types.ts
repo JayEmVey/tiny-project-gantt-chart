@@ -76,3 +76,10 @@ export interface Dependency {
   toTaskId: number
   type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish'
 }
+
+export interface Milestone {
+  id: number
+  name: string
+  date: string // DD/MM/YYYY format
+  color: string // Hex color code or Tailwind class
+}

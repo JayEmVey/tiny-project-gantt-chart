@@ -1,15 +1,19 @@
 import React, { useState, useRef, useEffect, forwardRef } from 'react';
-import { Task, ZoomLevel, Epic } from '../../types';
+import { Task, ZoomLevel, Epic, Milestone } from '../../types';
 import { calculateEpicDates } from '../../utils/epicDateCalculator';
 
 interface GanttChartViewProps {
   tasks: Task[];
   epics: Epic[];
+  milestones: Milestone[];
   zoomLevel: ZoomLevel;
   onTaskClick: (task: Task) => void;
   onEpicClick?: (epic: Epic) => void;
   onEmptyCellClick: (date: Date, taskIndex?: number) => void;
   onTaskDragInChart: (taskId: number, newStartDate: string, newEndDate: string) => void;
+  onMilestoneCreate: (date: string) => void;
+  onMilestoneClick: (milestone: Milestone) => void;
+  onMilestoneDragUpdate: (milestone: Milestone) => void;
   showCriticalPath: boolean;
 }
 
@@ -21,15 +25,21 @@ interface BarPosition {
 const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   tasks,
   epics,
+  milestones,
   zoomLevel,
   onTaskClick,
   onEpicClick,
   onEmptyCellClick,
   onTaskDragInChart,
+  onMilestoneCreate,
+  onMilestoneClick,
+  onMilestoneDragUpdate,
   showCriticalPath
 }, scrollRef) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [draggedTask, setDraggedTask] = useState<{ task: Task; startX: number } | null>(null);
+  const [milestonePreviewPosition, setMilestonePreviewPosition] = useState<number | null>(null);
+  const [draggedMilestone, setDraggedMilestone] = useState<{ milestone: Milestone; startX: number; originalPosition: number } | null>(null);
 
   // Generate time columns based on zoom level
   const generateTimeColumns = () => {
@@ -43,11 +53,12 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
         const weekStart = new Date(startDate);
         weekStart.setDate(startDate.getDate() + i * 7);
         columns.push({
-          label: `${i + 1}`,
+          label: `W${i + 1}`,
           date: weekStart,
           type: 'week',
           month: weekStart.getMonth(),
-          monthName: weekStart.toLocaleDateString('en-US', { month: 'short' })
+          monthName: weekStart.toLocaleDateString('en-US', { month: 'short' }),
+          quarter: Math.floor(weekStart.getMonth() / 3)
         });
       }
     } else if (zoomLevel === 'month') {
@@ -77,12 +88,17 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
       for (let i = 0; i < 365; i++) {
         const date = new Date(startDate);
         date.setDate(startDate.getDate() + i);
+        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const isSaturday = date.getDay() === 6;
+        const isSunday = date.getDay() === 0;
         columns.push({
           label: date.getDate().toString(),
           date: date,
           type: 'day',
           month: date.getMonth(),
-          monthName: date.toLocaleDateString('en-US', { month: 'short' })
+          monthName: date.toLocaleDateString('en-US', { month: 'long' }),
+          dayOfWeek: dayOfWeek,
+          isWeekend: isSaturday || isSunday
         });
       }
     }
@@ -125,6 +141,39 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
 
   const monthGroups = getMonthGroups();
 
+  // Group columns by quarter for week view header
+  const getQuarterGroups = () => {
+    if (zoomLevel !== 'week') return [];
+
+    const groups: { quarterName: string; count: number; startIndex: number }[] = [];
+    let currentQuarter = -1;
+    let currentGroup: { quarterName: string; count: number; startIndex: number } | null = null;
+
+    timeColumns.forEach((col: any, idx) => {
+      if (col.quarter !== currentQuarter) {
+        if (currentGroup) {
+          groups.push(currentGroup);
+        }
+        currentQuarter = col.quarter;
+        currentGroup = {
+          quarterName: `Q${col.quarter + 1} ${col.date.getFullYear()}`,
+          count: 1,
+          startIndex: idx
+        };
+      } else if (currentGroup) {
+        currentGroup.count++;
+      }
+    });
+
+    if (currentGroup) {
+      groups.push(currentGroup);
+    }
+
+    return groups;
+  };
+
+  const quarterGroups = getQuarterGroups();
+
   // Calculate today's position
   const getTodayPosition = (): number | null => {
     const today = new Date();
@@ -157,6 +206,38 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
     return new Date(year, month - 1, day);
   };
 
+  // Format date to DD/MM/YYYY
+  const formatDate = (date: Date): string => {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+  // Calculate milestone position (similar to today position but for any date)
+  const getMilestonePosition = (dateStr: string): number | null => {
+    const date = parseDate(dateStr);
+    const yearStart = new Date(date.getFullYear(), 0, 1);
+
+    let dateIndex = 0;
+
+    if (zoomLevel === 'day') {
+      dateIndex = Math.floor((date.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+    } else if (zoomLevel === 'week') {
+      dateIndex = Math.floor((date.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    } else if (zoomLevel === 'month') {
+      dateIndex = date.getMonth();
+    } else if (zoomLevel === 'quarter') {
+      dateIndex = Math.floor(date.getMonth() / 3);
+    }
+
+    // Check if date is within the visible range
+    if (dateIndex < 0 || dateIndex >= timeColumns.length) return null;
+
+    const columnWidth = 100 / timeColumns.length;
+    return dateIndex * columnWidth;
+  };
+
   // Calculate bar position for a task
   const calculateBarPosition = (startDate: string, endDate: string): BarPosition | null => {
     const start = parseDate(startDate);
@@ -168,10 +249,10 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
 
     if (zoomLevel === 'day') {
       startPosition = Math.floor((start.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
-      endPosition = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+      endPosition = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)) + 1; // +1 to include end date
     } else if (zoomLevel === 'week') {
       startPosition = Math.floor((start.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      endPosition = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      endPosition = Math.floor((end.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1; // +1 to include end week
     } else if (zoomLevel === 'month') {
       // For month view, we need more granular positioning within each month
       const startMonth = start.getMonth();
@@ -250,7 +331,8 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   const shouldShowEpics = zoomLevel === 'month' || zoomLevel === 'quarter';
   const itemsToDisplay = shouldShowEpics ? epicsWithDates : tasks;
 
-  const handleCellClick = (columnIndex: number, taskIndex: number) => {
+  const handleCellClick = (e: React.MouseEvent, columnIndex: number, taskIndex: number) => {
+    e.stopPropagation(); // Prevent the chart click from firing
     const column = timeColumns[columnIndex];
     onEmptyCellClick(column.date, taskIndex);
   };
@@ -293,12 +375,225 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
     { name: 'Q4', months: timeColumns.slice(Math.ceil(timeColumns.length * 3 / 4)) }
   ].filter(q => q.months.length > 0);
 
+  // Handle milestone mouse down
+  const handleMilestoneMouseDown = (e: React.MouseEvent, milestone: Milestone) => {
+    e.stopPropagation();
+    const position = getMilestonePosition(milestone.date);
+    if (position !== null) {
+      setDraggedMilestone({
+        milestone,
+        startX: e.clientX,
+        originalPosition: position
+      });
+    }
+  };
+
+  // Handle mouse move over chart for milestone preview and drag
+  const handleChartMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!chartRef.current) return;
+
+    const tableRect = chartRef.current.querySelector('table')?.getBoundingClientRect();
+    if (!tableRect) return;
+
+    // Calculate position relative to the table
+    const x = e.clientX - tableRect.left;
+    const tableWidth = tableRect.width;
+
+    // Get the first row's cell to determine column start position
+    const firstCell = chartRef.current.querySelector('thead th:first-child');
+    if (!firstCell) return;
+
+    const firstCellWidth = firstCell.getBoundingClientRect().width;
+
+    // Adjust x to account for the first column (task names)
+    const chartX = x - firstCellWidth;
+    if (chartX < 0) {
+      if (!draggedMilestone) {
+        setMilestonePreviewPosition(null);
+      }
+      return;
+    }
+
+    const chartWidth = tableWidth - firstCellWidth;
+    const position = (chartX / chartWidth) * 100;
+
+    // Handle milestone dragging
+    if (draggedMilestone) {
+      if (position >= 0 && position <= 100) {
+        setMilestonePreviewPosition(position);
+      }
+      return;
+    }
+
+    // Only show preview if within valid range and not dragging
+    if (position >= 0 && position <= 100) {
+      setMilestonePreviewPosition(position);
+    } else {
+      setMilestonePreviewPosition(null);
+    }
+  };
+
+  // Handle mouse leave from chart
+  const handleChartMouseLeave = () => {
+    if (!draggedMilestone) {
+      setMilestonePreviewPosition(null);
+    }
+  };
+
+  // Handle mouse up for milestone drag
+  const handleChartMouseUp = () => {
+    if (draggedMilestone && milestonePreviewPosition !== null) {
+      // Calculate the new date based on the preview position
+      const columnIndex = Math.floor((milestonePreviewPosition / 100) * timeColumns.length);
+      if (columnIndex >= 0 && columnIndex < timeColumns.length) {
+        const newDate = timeColumns[columnIndex].date;
+        const dateStr = formatDate(newDate);
+
+        // Update the milestone with the new date
+        const updatedMilestone = {
+          ...draggedMilestone.milestone,
+          date: dateStr
+        };
+
+        // Save directly without opening modal
+        onMilestoneDragUpdate(updatedMilestone);
+      }
+
+      setDraggedMilestone(null);
+      setMilestonePreviewPosition(null);
+    }
+  };
+
+  // Handle chart click to create milestone
+  const handleChartClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't create milestone if we just finished dragging
+    if (draggedMilestone) {
+      return;
+    }
+
+    // Only create milestone if clicking with preview line visible
+    if (!chartRef.current || milestonePreviewPosition === null) return;
+
+    // Calculate which date was clicked based on preview position
+    const columnIndex = Math.floor((milestonePreviewPosition / 100) * timeColumns.length);
+    if (columnIndex >= 0 && columnIndex < timeColumns.length) {
+      const clickedDate = timeColumns[columnIndex].date;
+      const dateStr = formatDate(clickedDate);
+      onMilestoneCreate(dateStr);
+    }
+  };
+
+  // Add global mouse up handler for milestone dragging
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (draggedMilestone && milestonePreviewPosition !== null) {
+        // Calculate the new date based on the preview position
+        const columnIndex = Math.floor((milestonePreviewPosition / 100) * timeColumns.length);
+        if (columnIndex >= 0 && columnIndex < timeColumns.length) {
+          const newDate = timeColumns[columnIndex].date;
+          const dateStr = formatDate(newDate);
+
+          // Update the milestone with the new date
+          const updatedMilestone = {
+            ...draggedMilestone.milestone,
+            date: dateStr
+          };
+
+          // Save directly without opening modal
+          onMilestoneDragUpdate(updatedMilestone);
+        }
+      }
+
+      setDraggedMilestone(null);
+      setMilestonePreviewPosition(null);
+    };
+
+    if (draggedMilestone) {
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      return () => {
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
+      };
+    }
+  }, [draggedMilestone, milestonePreviewPosition, timeColumns, onMilestoneDragUpdate]);
+
   return (
     <div ref={scrollRef} className="flex-1 overflow-auto bg-gray-50">
-      <div ref={chartRef} className="min-w-max relative">
+      <div
+        ref={chartRef}
+        className="min-w-max relative"
+        onMouseMove={handleChartMouseMove}
+        onMouseLeave={handleChartMouseLeave}
+        onMouseUp={handleChartMouseUp}
+        onClick={handleChartClick}
+      >
         <table className="w-full border-collapse">
-          <thead>
-            {/* Month Row (for day view) */}
+          <thead className="sticky top-0 z-30">
+            {/* Milestone Header Row */}
+            <tr className="relative h-8">
+              <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 w-64">
+                {/* Empty cell for task names column */}
+              </th>
+              <th colSpan={timeColumns.length} className="border-2 border-gray-800 p-0 relative bg-white">
+                <div className="relative w-full h-8">
+                  {/* Milestone preview line in header */}
+                  {milestonePreviewPosition !== null && (
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${milestonePreviewPosition}%`,
+                        top: 0,
+                        bottom: 0,
+                        zIndex: 30
+                      }}
+                    >
+                      <div className="relative h-full">
+                        <div className="absolute w-0.5 h-full bg-gray-400 opacity-50" />
+                        {draggedMilestone && (
+                          <div className="absolute top-0 left-1/2 transform -translate-x-1/2">
+                            <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/>
+                            </svg>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {/* Milestones in header */}
+                  {milestones.map((milestone) => {
+                    const position = getMilestonePosition(milestone.date);
+                    if (position === null) return null;
+                    const isDragging = draggedMilestone?.milestone.id === milestone.id;
+                    return (
+                      <div
+                        key={milestone.id}
+                        className={`absolute top-0 bottom-0 ${isDragging ? 'opacity-50 cursor-grabbing' : 'cursor-grab hover:opacity-80'} transition-opacity`}
+                        style={{
+                          left: `${position}%`,
+                          zIndex: 31
+                        }}
+                        onMouseDown={(e) => handleMilestoneMouseDown(e, milestone)}
+                        onClick={(e) => {
+                          if (!draggedMilestone) {
+                            e.stopPropagation();
+                            onMilestoneClick(milestone);
+                          }
+                        }}
+                      >
+                        <div className="relative h-full flex items-center">
+                          <div
+                            className="absolute left-1/2 transform -translate-x-1/2 text-white text-xs font-bold px-2 py-0.5 rounded whitespace-nowrap shadow-md"
+                            style={{ backgroundColor: milestone.color }}
+                          >
+                            {milestone.name}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </th>
+            </tr>
+            {/* Year + Month Row (for day view) */}
             {zoomLevel === 'day' && monthGroups.length > 0 && (
               <tr>
                 <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
@@ -310,44 +605,100 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                     colSpan={group.count}
                     className="bg-blue-100 border-2 border-gray-800 p-3 text-center font-bold text-gray-800 text-base"
                   >
-                    {group.monthName}
+                    {group.monthName} {timeColumns[group.startIndex]?.date.getFullYear()}
                   </th>
                 ))}
               </tr>
             )}
 
-            {/* Quarter Row (only for certain zoom levels) */}
-            {(zoomLevel === 'week' || zoomLevel === 'month') && (
+            {/* Quarter Row (for week view) */}
+            {zoomLevel === 'week' && quarterGroups.length > 0 && (
               <tr>
                 <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {/* Empty cell for task names column */}
                 </th>
-                {quarters.map((quarter, idx) => (
+                {quarterGroups.map((group, idx) => (
                   <th
                     key={idx}
-                    colSpan={quarter.months.length}
+                    colSpan={group.count}
                     className="bg-gray-200 border-2 border-gray-800 p-3 text-center font-bold text-gray-800"
                   >
-                    {quarter.name}
+                    {group.quarterName}
                   </th>
                 ))}
               </tr>
             )}
 
-            {/* Time Period Row */}
-            <tr>
-              <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
-                {shouldShowEpics ? 'Epic' : 'Task'}
-              </th>
-              {timeColumns.map((column, idx) => (
-                <th
-                  key={idx}
-                  className="bg-gray-100 border border-gray-300 p-2 text-center text-sm font-semibold text-gray-700 min-w-12"
-                >
-                  {column.label}
+            {/* Year Row (for month and quarter view) */}
+            {(zoomLevel === 'month' || zoomLevel === 'quarter') && (
+              <tr>
+                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                  {/* Empty cell for task names column */}
                 </th>
-              ))}
-            </tr>
+                <th
+                  colSpan={timeColumns.length}
+                  className="bg-gray-200 border-2 border-gray-800 p-3 text-center font-bold text-gray-800"
+                >
+                  {zoomLevel === 'quarter' ? `Q1 ${new Date().getFullYear()}` : new Date().getFullYear()}
+                </th>
+              </tr>
+            )}
+
+            {/* Day of Week + Day Number Row (for day view) */}
+            {zoomLevel === 'day' && (
+              <tr>
+                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                  {shouldShowEpics ? 'Epic' : 'Task'}
+                </th>
+                {timeColumns.map((column: any, idx) => (
+                  <th
+                    key={idx}
+                    className={`border border-gray-300 p-2 text-center text-sm font-semibold min-w-12 ${
+                      column.isWeekend ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center">
+                      <div className="text-xs">{column.label}</div>
+                      <div className="text-xs">{column.dayOfWeek}</div>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            )}
+
+            {/* Week Number Row (for week view) */}
+            {zoomLevel === 'week' && (
+              <tr>
+                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                  {shouldShowEpics ? 'Epic' : 'Task'}
+                </th>
+                {timeColumns.map((column, idx) => (
+                  <th
+                    key={idx}
+                    className="bg-gray-100 border border-gray-300 p-2 text-center text-sm font-semibold text-gray-700 min-w-12"
+                  >
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            )}
+
+            {/* Month/Quarter Row (for month and quarter view) */}
+            {(zoomLevel === 'month' || zoomLevel === 'quarter') && (
+              <tr>
+                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                  {shouldShowEpics ? 'Epic' : 'Task'}
+                </th>
+                {timeColumns.map((column, idx) => (
+                  <th
+                    key={idx}
+                    className="bg-gray-100 border border-gray-300 p-2 text-center text-sm font-semibold text-gray-700 min-w-12"
+                  >
+                    {column.label}
+                  </th>
+                ))}
+              </tr>
+            )}
           </thead>
           <tbody>
             {shouldShowEpics ? (
@@ -359,10 +710,13 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                 return (
                   <tr key={epic.id} className="hover:bg-gray-50 transition-colors">
                     <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
-                      <div className="flex flex-col">
-                        <span>{epic.name}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-pink-500 rounded flex-shrink-0" />
+                          <span className="truncate">{epic.name}</span>
+                        </div>
                         {epic.assignee && (
-                          <span className="text-xs text-gray-500">{epic.assignee}</span>
+                          <span className="text-xs text-gray-500 ml-6">{epic.assignee}</span>
                         )}
                       </div>
                     </td>
@@ -372,7 +726,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                           <div
                             key={colIdx}
                             className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
-                            onClick={() => handleCellClick(colIdx, epicIndex)}
+                            onClick={(e) => handleCellClick(e, colIdx, epicIndex)}
                             style={{ minWidth: '48px', height: '64px', flexGrow: 1 }}
                           />
                         ))}
@@ -421,6 +775,48 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                             </div>
                           </div>
                         )}
+                        {/* Milestone preview line for first row */}
+                        {epicIndex === 0 && milestonePreviewPosition !== null && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${milestonePreviewPosition}%`,
+                              top: '-100vh',
+                              bottom: '-100vh',
+                              zIndex: 19
+                            }}
+                          >
+                            <div className="relative h-full">
+                              <div className="absolute w-0.5 h-full bg-gray-400 opacity-50" />
+                            </div>
+                          </div>
+                        )}
+                        {/* Milestones for first row - only vertical lines */}
+                        {epicIndex === 0 && milestones.map((milestone) => {
+                          const position = getMilestonePosition(milestone.date);
+                          if (position === null) return null;
+                          const isDragging = draggedMilestone?.milestone.id === milestone.id;
+                          return (
+                            <div
+                              key={milestone.id}
+                              className="absolute pointer-events-none"
+                              style={{
+                                left: `${position}%`,
+                                top: '-100vh',
+                                bottom: '-100vh',
+                                zIndex: 21,
+                                opacity: isDragging ? 0.3 : 1
+                              }}
+                            >
+                              <div className="relative h-full">
+                                <div
+                                  className="absolute w-0.5 h-full"
+                                  style={{ backgroundColor: milestone.color }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </td>
                   </tr>
@@ -435,10 +831,13 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                 return (
                   <tr key={task.id} className="hover:bg-gray-50 transition-colors">
                     <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
-                      <div className="flex flex-col">
-                        <span>{task.process}</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3.5 h-3.5 bg-blue-600 rounded flex-shrink-0" />
+                          <span className="truncate">{task.process}</span>
+                        </div>
                         {task.assignee && (
-                          <span className="text-xs text-gray-500">{task.assignee}</span>
+                          <span className="text-xs text-gray-500 ml-5">{task.assignee}</span>
                         )}
                       </div>
                     </td>
@@ -448,7 +847,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                           <div
                             key={colIdx}
                             className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
-                            onClick={() => handleCellClick(colIdx, taskIndex)}
+                            onClick={(e) => handleCellClick(e, colIdx, taskIndex)}
                             style={{ minWidth: '48px', height: '64px', flexGrow: 1 }}
                           />
                         ))}
@@ -501,6 +900,48 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                             </div>
                           </div>
                         )}
+                        {/* Milestone preview line for first row */}
+                        {taskIndex === 0 && milestonePreviewPosition !== null && (
+                          <div
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${milestonePreviewPosition}%`,
+                              top: '-100vh',
+                              bottom: '-100vh',
+                              zIndex: 19
+                            }}
+                          >
+                            <div className="relative h-full">
+                              <div className="absolute w-0.5 h-full bg-gray-400 opacity-50" />
+                            </div>
+                          </div>
+                        )}
+                        {/* Milestones for first row - only vertical lines */}
+                        {taskIndex === 0 && milestones.map((milestone) => {
+                          const position = getMilestonePosition(milestone.date);
+                          if (position === null) return null;
+                          const isDragging = draggedMilestone?.milestone.id === milestone.id;
+                          return (
+                            <div
+                              key={milestone.id}
+                              className="absolute pointer-events-none"
+                              style={{
+                                left: `${position}%`,
+                                top: '-100vh',
+                                bottom: '-100vh',
+                                zIndex: 21,
+                                opacity: isDragging ? 0.3 : 1
+                              }}
+                            >
+                              <div className="relative h-full">
+                                <div
+                                  className="absolute w-0.5 h-full"
+                                  style={{ backgroundColor: milestone.color }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </td>
                   </tr>

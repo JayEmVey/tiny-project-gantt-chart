@@ -8,6 +8,7 @@ interface HeaderProps {
   onNewProject: () => void;
   projectName?: string;
   onProjectNameChange?: (name: string) => void;
+  hasUnsavedChanges?: boolean;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -16,7 +17,8 @@ const Header: React.FC<HeaderProps> = ({
   onOpenProject,
   onNewProject,
   projectName = 'Untitled Project',
-  onProjectNameChange
+  onProjectNameChange,
+  hasUnsavedChanges = false
 }) => {
   const [showProjectMenu, setShowProjectMenu] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -155,6 +157,9 @@ const Header: React.FC<HeaderProps> = ({
           ) : (
             <>
               <span className="text-lg font-semibold text-gray-700">{projectName}</span>
+              {hasUnsavedChanges && (
+                <span className="w-2 h-2 bg-orange-500 rounded-full" title="Unsaved changes"></span>
+              )}
               <button
                 onClick={() => setIsEditingName(true)}
                 className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"

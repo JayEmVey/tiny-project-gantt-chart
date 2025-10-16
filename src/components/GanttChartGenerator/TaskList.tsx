@@ -314,7 +314,10 @@ const TaskList: React.FC<TaskListProps> = ({
                     <ChevronRight className="w-4 h-4" />
                   )}
                 </button>
-                <span className="ml-2 font-bold text-gray-800">{epic.name}</span>
+                <div className="ml-2 flex items-center gap-2">
+                  <div className="w-4 h-4 bg-pink-500 rounded flex-shrink-0" />
+                  <span className="font-bold text-gray-800">{epic.name}</span>
+                </div>
               </div>
 
               {/* User Stories under Epic */}
@@ -356,7 +359,14 @@ const TaskList: React.FC<TaskListProps> = ({
                             <ChevronRight className="w-3 h-3" />
                           )}
                         </button>
-                        <span className="ml-2 font-medium text-gray-700">{userStory.name}</span>
+                        <div className="ml-2 flex items-center gap-2">
+                          <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center flex-shrink-0">
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <span className="font-medium text-gray-700">{userStory.name}</span>
+                        </div>
                       </div>
 
                       {/* Tasks under User Story */}
@@ -368,7 +378,10 @@ const TaskList: React.FC<TaskListProps> = ({
                               onClick={() => onTaskClick(task)}
                               className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
                             >
-                              <span className="ml-6 text-sm text-gray-600">{task.process}</span>
+                              <div className="ml-6 flex items-center gap-2">
+                                <div className="w-3.5 h-3.5 bg-blue-600 rounded flex-shrink-0" />
+                                <span className="text-sm text-gray-600">{task.process}</span>
+                              </div>
                             </div>
                           ))}
                         </div>
