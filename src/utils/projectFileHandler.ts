@@ -35,11 +35,26 @@ export const saveProjectToFile = (
   // Create a blob
   const blob = new Blob([jsonString], { type: 'application/json' });
 
+  // Generate filename with format: projectname_YYYYMMDD.tgc
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+
+  // Clean project name (remove special characters, replace spaces with underscores)
+  const cleanProjectName = (projectName || 'project')
+    .replace(/[^a-zA-Z0-9\s-]/g, '')
+    .replace(/\s+/g, '_')
+    .toLowerCase();
+
+  const filename = `${cleanProjectName}_${dateStr}.tgc`;
+
   // Create download link
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${projectName || 'project'}.tgc`;
+  link.download = filename;
 
   // Trigger download
   document.body.appendChild(link);

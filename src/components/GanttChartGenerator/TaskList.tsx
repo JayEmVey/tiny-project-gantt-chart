@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, ChevronDown, ChevronRight, ChevronsLeft } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, ChevronsLeft, Copy, Trash2 } from 'lucide-react';
 import { Task, Epic, UserStory } from '../../types';
 
 interface TaskListProps {
@@ -16,6 +16,8 @@ interface TaskListProps {
   onEpicClick?: (epic: Epic) => void;
   onUserStoryClick?: (userStory: UserStory) => void;
   onToggleCollapse?: () => void;
+  onCloneEpic?: (epicId: number) => void;
+  onDeleteEpic?: (epicId: number) => void;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
@@ -31,7 +33,9 @@ const TaskList: React.FC<TaskListProps> = ({
   onAddUserStory,
   onEpicClick,
   onUserStoryClick,
-  onToggleCollapse
+  onToggleCollapse,
+  onCloneEpic,
+  onDeleteEpic
 }) => {
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set());
   const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set());
@@ -40,6 +44,11 @@ const TaskList: React.FC<TaskListProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Get selected epics
+  const selectedEpics = epics.filter(epic => epic.isSelected);
+  const hasSelectedEpics = selectedEpics.length > 0;
+  const allEpicsSelected = epics.length > 0 && epics.every(epic => epic.isSelected);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -80,6 +89,46 @@ const TaskList: React.FC<TaskListProps> = ({
       }
       return newSet;
     });
+  };
+
+  const handleCheckUncheckAll = () => {
+    // Toggle all epics
+    if (allEpicsSelected) {
+      // Uncheck all
+      epics.forEach(epic => {
+        if (epic.isSelected) {
+          onEpicToggle(epic.id);
+        }
+      });
+    } else {
+      // Check all
+      epics.forEach(epic => {
+        if (!epic.isSelected) {
+          onEpicToggle(epic.id);
+        }
+      });
+    }
+  };
+
+  const handleCloneSelected = () => {
+    if (selectedEpics.length > 0 && onCloneEpic) {
+      selectedEpics.forEach(epic => {
+        onCloneEpic(epic.id);
+      });
+    }
+  };
+
+  const handleDeleteSelected = () => {
+    if (selectedEpics.length > 0 && onDeleteEpic) {
+      const confirmDelete = window.confirm(
+        `Are you sure you want to delete ${selectedEpics.length} epic(s)? This will also delete all related user stories and tasks.`
+      );
+      if (confirmDelete) {
+        selectedEpics.forEach(epic => {
+          onDeleteEpic(epic.id);
+        });
+      }
+    }
   };
 
   // Get user stories for an epic
@@ -131,22 +180,62 @@ const TaskList: React.FC<TaskListProps> = ({
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-      {/* Header with Collapse Button */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <button
-          onClick={() => setShowAddMenu(!showAddMenu)}
-          className="flex items-center justify-center p-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <Plus className="w-5 h-5" strokeWidth={2} />
-        </button>
-        {onToggleCollapse && (
-          <button
-            onClick={onToggleCollapse}
-            className="flex items-center justify-center p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Hide sidebar"
-          >
-            <ChevronsLeft className="w-5 h-5" strokeWidth={2} />
-          </button>
+      {/* Header with Actions */}
+      <div className="p-4 border-b border-gray-200 space-y-3">
+        {/* Top Row: Add, Clone, Delete, Collapse */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAddMenu(!showAddMenu)}
+              className="flex items-center justify-center p-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+              title="Add new item"
+            >
+              <Plus className="w-5 h-5" strokeWidth={2} />
+            </button>
+
+            {hasSelectedEpics && onCloneEpic && (
+              <button
+                onClick={handleCloneSelected}
+                className="flex items-center justify-center px-3 py-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Clone selected epic(s)"
+              >
+                <Copy className="w-4 h-4" strokeWidth={2} />
+              </button>
+            )}
+
+            {hasSelectedEpics && onDeleteEpic && (
+              <button
+                onClick={handleDeleteSelected}
+                className="flex items-center justify-center px-3 py-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+                title="Delete selected epic(s)"
+              >
+                <Trash2 className="w-4 h-4" strokeWidth={2} />
+              </button>
+            )}
+          </div>
+
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="flex items-center justify-center p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Hide sidebar"
+            >
+              <ChevronsLeft className="w-5 h-5" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+
+        {/* Bottom Row: Check/Uncheck All */}
+        {epics.length > 0 && (
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={allEpicsSelected}
+              onChange={handleCheckUncheckAll}
+              className="w-4 h-4 border-2 border-gray-300 rounded cursor-pointer"
+            />
+            <span className="text-sm text-gray-600">Check/Uncheck All</span>
+          </div>
         )}
       </div>
 

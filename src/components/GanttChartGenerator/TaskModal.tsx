@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Task, Epic, UserStory } from '../../types';
+import { getAssigneeList } from '../../utils/assigneeListParser';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -236,12 +237,18 @@ const TaskModal: React.FC<TaskModalProps> = ({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Assignee
             </label>
-            <input
-              type="text"
+            <select
               value={formData.assignee || ''}
               onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            >
+              <option value="">Select an assignee</option>
+              {getAssigneeList().map((assignee) => (
+                <option key={assignee} value={assignee}>
+                  {assignee}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Status and Priority */}

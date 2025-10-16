@@ -139,6 +139,26 @@ const GanttChartMain: React.FC = () => {
 
   const filteredTasks = getFilteredTasks();
 
+  // Handle New Project
+  const handleNewProject = () => {
+    const confirmNew = window.confirm(
+      'Are you sure you want to create a new project? Any unsaved changes will be lost.'
+    );
+
+    if (confirmNew) {
+      // Reset to completely empty state
+      setProjectName('New Project');
+      setEpics([]);
+      setUserStories([]);
+      setTasks([]);
+      setZoomLevel('day');
+      setShowCriticalPath(false);
+      setIsTaskListCollapsed(false);
+
+      alert('New project created successfully!');
+    }
+  };
+
   // Handle Save Project
   const handleSaveProject = () => {
     try {
@@ -309,8 +329,19 @@ const GanttChartMain: React.FC = () => {
 
   // Handle Epic toggle
   const handleEpicToggle = (epicId: number) => {
-    setEpics(epics.map(epic =>
-      epic.id === epicId ? { ...epic, isSelected: !epic.isSelected } : epic
+    const epic = epics.find(e => e.id === epicId);
+    if (!epic) return;
+
+    const newSelectedState = !epic.isSelected;
+
+    // Update Epic
+    setEpics(epics.map(e =>
+      e.id === epicId ? { ...e, isSelected: newSelectedState } : e
+    ));
+
+    // Update all related User Stories
+    setUserStories(userStories.map(us =>
+      us.epicId === epicId ? { ...us, isSelected: newSelectedState } : us
     ));
   };
 
@@ -350,6 +381,61 @@ const GanttChartMain: React.FC = () => {
     setUserStories(userStories.filter(us => us.epicId !== epicId));
     setTasks(tasks.filter(t => t.epicId !== epicId));
     setEpics(epics.filter(e => e.id !== epicId));
+  };
+
+  // Handle clone Epic
+  const handleCloneEpic = (epicId: number) => {
+    const epicToClone = epics.find(e => e.id === epicId);
+    if (!epicToClone) return;
+
+    // Generate new IDs
+    const newEpicId = Date.now();
+    const timestamp = Date.now();
+
+    // Clone Epic
+    const clonedEpic: Epic = {
+      ...epicToClone,
+      id: newEpicId,
+      name: `${epicToClone.name} (Copy)`,
+      isSelected: false
+    };
+
+    // Clone related User Stories
+    const relatedUserStories = userStories.filter(us => us.epicId === epicId);
+    const clonedUserStories: UserStory[] = [];
+    const userStoryIdMap = new Map<number, number>(); // old ID -> new ID mapping
+
+    relatedUserStories.forEach((us, index) => {
+      const newUserStoryId = timestamp + index + 1;
+      userStoryIdMap.set(us.id, newUserStoryId);
+      clonedUserStories.push({
+        ...us,
+        id: newUserStoryId,
+        epicId: newEpicId,
+        name: `${us.name} (Copy)`,
+        isSelected: false
+      });
+    });
+
+    // Clone related Tasks
+    const relatedTasks = tasks.filter(t => t.epicId === epicId);
+    const clonedTasks: Task[] = relatedTasks.map((task, index) => {
+      const newUserStoryId = task.userStoryId ? userStoryIdMap.get(task.userStoryId) : undefined;
+      return {
+        ...task,
+        id: timestamp + relatedUserStories.length + index + 1,
+        process: `${task.process} (Copy)`,
+        epicId: newEpicId,
+        userStoryId: newUserStoryId,
+        // Reset dependencies since they might reference tasks outside this epic
+        dependencies: []
+      };
+    });
+
+    // Update state with cloned items
+    setEpics([...epics, clonedEpic]);
+    setUserStories([...userStories, ...clonedUserStories]);
+    setTasks([...tasks, ...clonedTasks]);
   };
 
   // Handle add User Story
@@ -395,7 +481,9 @@ const GanttChartMain: React.FC = () => {
         onExport={handleExport}
         onSaveProject={handleSaveProject}
         onOpenProject={handleOpenProject}
+        onNewProject={handleNewProject}
         projectName={projectName}
+        onProjectNameChange={setProjectName}
       />
 
       {/* View Controls */}
@@ -427,6 +515,8 @@ const GanttChartMain: React.FC = () => {
             onEpicClick={handleEditEpic}
             onUserStoryClick={handleEditUserStory}
             onToggleCollapse={() => setIsTaskListCollapsed(true)}
+            onCloneEpic={handleCloneEpic}
+            onDeleteEpic={handleDeleteEpic}
           />
         )}
 
