@@ -26,7 +26,7 @@ const TaskList: React.FC<TaskListProps> = ({
   userStories,
   onAddTask,
   onTaskClick,
-  onTaskReorder,
+  onTaskReorder: _onTaskReorder,
   onEpicToggle,
   onUserStoryToggle,
   onAddEpic,
@@ -39,9 +39,9 @@ const TaskList: React.FC<TaskListProps> = ({
 }) => {
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set());
   const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set());
-  const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
-  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  // const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
+  // const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  // const [isDragging, setIsDragging] = useState(false); // currently unused
   const [showAddMenu, setShowAddMenu] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
@@ -141,42 +141,11 @@ const TaskList: React.FC<TaskListProps> = ({
     return tasks.filter(task => task.userStoryId === userStoryId);
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedTaskIndex(index);
-    setIsDragging(true);
-    e.dataTransfer.effectAllowed = 'move';
-    // Add slight transparency to the dragged element
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '0.5';
-    }
-  };
-
-  const handleDragEnd = (e: React.DragEvent) => {
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '1';
-    }
-
-    // Perform the reorder
-    if (draggedTaskIndex !== null && dropTargetIndex !== null && draggedTaskIndex !== dropTargetIndex) {
-      onTaskReorder(draggedTaskIndex, dropTargetIndex);
-    }
-
-    setDraggedTaskIndex(null);
-    setDropTargetIndex(null);
-    setIsDragging(false);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedTaskIndex === null) return;
-
-    setDropTargetIndex(index);
-  };
-
-  const handleDragLeave = () => {
-    // Only clear if we're actually leaving the list
-    setDropTargetIndex(null);
-  };
+  // Drag handlers not currently wired in UI
+  // const handleDragStart = (e: React.DragEvent, index: number) => { /* ... */ };
+  // const handleDragEnd = (e: React.DragEvent) => { /* ... */ };
+  // const handleDragOver = (e: React.DragEvent, index: number) => { /* ... */ };
+  // const handleDragLeave = () => { /* ... */ };
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">

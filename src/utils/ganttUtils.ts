@@ -1,4 +1,4 @@
-import { BarPosition, GanttTask, ZoomLevel } from '../types';
+import { BarPosition, GanttTask } from '../types';
 
 export const parseDate = (dateStr: string): Date | null => {
   if (!dateStr) return null;

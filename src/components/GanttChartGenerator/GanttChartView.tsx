@@ -31,7 +31,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   onTaskClick,
   onEpicClick,
   onEmptyCellClick,
-  onTaskDragInChart,
+  onTaskDragInChart: _onTaskDragInChart,
   onMilestoneCreate,
   onMilestoneClick,
   onMilestoneDragUpdate,
@@ -333,7 +333,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
 
   // Determine what to display based on zoom level
   const shouldShowEpics = zoomLevel === 'month' || zoomLevel === 'quarter';
-  const itemsToDisplay = shouldShowEpics ? epicsWithDates : tasks;
+  // const itemsToDisplay = shouldShowEpics ? epicsWithDates : tasks; // not used in current rendering path
 
   const handleCellClick = (e: React.MouseEvent, columnIndex: number, taskIndex: number) => {
     e.stopPropagation(); // Prevent the chart click from firing
@@ -383,7 +383,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   };
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = (_e: MouseEvent) => {
       if (draggedTask) {
         // Calculate new position based on mouse movement
         // This is a simplified version - you'd need more sophisticated logic
@@ -408,12 +408,13 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   }, [draggedTask]);
 
   // Group months by quarter for header
-  const quarters = [
-    { name: 'Q1', months: timeColumns.slice(0, Math.ceil(timeColumns.length / 4)) },
-    { name: 'Q2', months: timeColumns.slice(Math.ceil(timeColumns.length / 4), Math.ceil(timeColumns.length / 2)) },
-    { name: 'Q3', months: timeColumns.slice(Math.ceil(timeColumns.length / 2), Math.ceil(timeColumns.length * 3 / 4)) },
-    { name: 'Q4', months: timeColumns.slice(Math.ceil(timeColumns.length * 3 / 4)) }
-  ].filter(q => q.months.length > 0);
+  // (unused) quarters grouping retained in case needed later
+  // const quarters = [
+  //   { name: 'Q1', months: timeColumns.slice(0, Math.ceil(timeColumns.length / 4)) },
+  //   { name: 'Q2', months: timeColumns.slice(Math.ceil(timeColumns.length / 4), Math.ceil(timeColumns.length / 2)) },
+  //   { name: 'Q3', months: timeColumns.slice(Math.ceil(timeColumns.length / 2), Math.ceil(timeColumns.length * 3 / 4)) },
+  //   { name: 'Q4', months: timeColumns.slice(Math.ceil(timeColumns.length * 3 / 4)) }
+  // ].filter(q => q.months.length > 0);
 
   // Handle milestone mouse down
   const handleMilestoneMouseDown = (e: React.MouseEvent, milestone: Milestone) => {
@@ -505,7 +506,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   };
 
   // Handle chart click to create milestone
-  const handleChartClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleChartClick = (_e: React.MouseEvent<HTMLDivElement>) => {
     // Don't create milestone if we just finished dragging
     if (draggedMilestone) {
       return;
@@ -762,7 +763,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                     </td>
                     <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>
                       <div className="relative w-full h-16" style={{ display: 'flex' }}>
-                        {timeColumns.map((column, colIdx) => (
+                        {timeColumns.map((_column, colIdx) => (
                           <div
                             key={colIdx}
                             className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"
@@ -902,7 +903,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                     </td>
                     <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>
                       <div className="relative w-full h-16" style={{ display: 'flex' }}>
-                        {timeColumns.map((column, colIdx) => (
+                        {timeColumns.map((_column, colIdx) => (
                           <div
                             key={colIdx}
                             className="border border-gray-200 cursor-pointer hover:bg-blue-50 transition-colors flex-shrink-0"

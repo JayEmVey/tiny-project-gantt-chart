@@ -1,109 +1,221 @@
 # tiny-project-gantt-chart
 
-A lite version of project timeline management using the Gantt chart style. Built with React, TypeScript, and Vite.
+A tiny, fast, and interactive Gantt chart for project timelines. Built with React, TypeScript, Tailwind, and Vite.
 
-## Features
+## ✨ What's inside (current)
 
-- 📊 Visual Gantt chart timeline
-- 📅 Task scheduling with start and end dates
-- 📈 Progress tracking for each task
-- 🔗 Task dependencies support
-- 🎨 Responsive design with dark/light mode support
-- ⚡ Fast and lightweight
+- Pink-themed, modern UI/UX
+- Interactive Gantt bars: drag to move, resize from edges
+- Modal editing with date pickers (DD/MM/YYYY)
+- CSV import/export (simple, human-friendly format)
+- Toggle between Chart and Edit views
+- Lightweight and responsive
+
+## Preview
+
+Run locally and open the app to see the pink theme with months/quarters, draggable gantt bars, and an Edit Data table view.
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm or yarn
+- Node.js 18+
+- npm (comes with Node)
 
-### Installation
+### Install & run
 
-1. Clone the repository:
+1) Clone and install
 ```bash
 git clone https://github.com/JayEmVey/tiny-project-gantt-chart.git
 cd tiny-project-gantt-chart
-```
-
-2. Install dependencies:
-```bash
 npm install
 ```
 
-3. Start the development server:
+2) Start dev server
 ```bash
 npm run dev
 ```
 
-4. Open your browser and navigate to `http://localhost:5173`
+The dev server prints a URL like http://localhost:5173 or http://localhost:5174.
 
-## Available Scripts
+## Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+- `npm run dev` – start Vite dev server
+- `npm run build` – build the production bundle to `dist/`
+- `npm run preview` – serve the production build locally
+- `npm run lint` – run ESLint
 
-## Project Structure
+## Project Structure (key files)
 
 ```
-tiny-project-gantt-chart/
-├── src/
-│   ├── components/
-│   │   ├── GanttChart.tsx      # Main Gantt chart component
-│   │   └── GanttChart.css      # Gantt chart styles
-│   ├── App.tsx                 # Main application component
-│   ├── App.css                 # Application styles
-│   ├── main.tsx                # Application entry point
-│   ├── index.css               # Global styles
-│   └── types.ts                # TypeScript type definitions
-├── public/                     # Static assets
-├── index.html                  # HTML entry point
-├── package.json                # Project dependencies
-├── tsconfig.json               # TypeScript configuration
-├── vite.config.ts              # Vite configuration
-└── .eslintrc.cjs               # ESLint configuration
+src/
+  components/
+    GanttChart.css                        # Additional Gantt styles
+    GanttChartGenerator/
+      GanttChartGenerator.tsx             # Main feature component
+      ChartView.tsx, EditTable.tsx, ...   # Supporting UI pieces
+  constants/
+    calendar.ts                           # Months/quarters
+  hooks/
+    useGanttTasks.ts                      # (legacy) tasks hook
+  utils/
+    ganttUtils.ts                         # CSV utilities (legacy)
+  App.tsx                                 # Mounts GanttChartGenerator
+  types.ts                                # Types used in the app
 ```
 
-## Usage
+## Current Task shape
 
-The application comes with sample tasks to demonstrate the Gantt chart functionality. You can customize the tasks in `src/App.tsx`:
+The refactor uses simple string dates in day-first format:
 
-```typescript
-const sampleTasks: Task[] = [
-  {
-    id: '1',
-    name: 'Project Planning',
-    startDate: new Date('2024-01-01'),
-    endDate: new Date('2024-01-15'),
-    progress: 100
-  },
-  // Add more tasks...
-]
-```
-
-## Task Interface
-
-Each task has the following properties:
-
-```typescript
-interface Task {
-  id: string              // Unique identifier
-  name: string            // Task name
-  startDate: Date         // Task start date
-  endDate: Date           // Task end date
-  progress: number        // Progress percentage (0-100)
-  dependencies?: string[] // Array of dependent task IDs
+```ts
+export interface Task {
+  id: number
+  process: string
+  startDate: string // DD/MM/YYYY
+  endDate: string   // DD/MM/YYYY
 }
 ```
 
-## Technologies Used
+## Using the app
 
-- [React](https://react.dev/) - UI library
-- [TypeScript](https://www.typescriptlang.org/) - Type safety
-- [Vite](https://vitejs.dev/) - Build tool and dev server
-- [ESLint](https://eslint.org/) - Code linting
+- Edit vs Chart view: use the top-left button to toggle
+- In Edit view:
+  - Change process name or adjust start/end via date pickers
+  - Add rows (Add Process) or delete rows
+- In Chart view:
+  - Drag a bar to move dates
+  - Drag edges to resize
+  - Click a bar to open the edit modal
+- Import/Export CSV to move data around
+
+### CSV format
+
+CSV has a header row plus rows with three fields:
+
+```
+Process,Start Date,End Date
+"Planning",01/01/2025,28/02/2025
+"Wireframing",01/03/2025,15/04/2025
+```
+
+- Process may be quoted if it contains commas
+- Date format must be `DD/MM/YYYY`
+
+## Build
+
+Generate a production build in `dist/`:
+
+```bash
+npm run build
+```
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+## Production deployment
+
+This is a static site. After `npm run build`, deploy the `dist/` folder to any static host.
+
+### Option A: Netlify
+
+- Build command: `npm run build`
+- Publish directory: `dist`
+
+Drag-and-drop the `dist/` folder to Netlify, or connect your repo with the above settings.
+
+### Option B: Vercel
+
+- Framework preset: “Other”
+- Build command: `npm run build`
+- Output directory: `dist`
+
+### Option C: GitHub Pages (via Actions)
+
+1) Ensure your repository is on GitHub
+2) Add a GitHub Actions workflow that builds and publishes `dist/` to `gh-pages`
+
+Example workflow (optional) placed at `.github/workflows/deploy.yml`:
+
+```yaml
+name: Deploy to GitHub Pages
+on:
+  push:
+    branches: [ main ]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+Enable GitHub Pages in your repo settings, “Build and deployment” → “GitHub Actions”.
+
+### Option D: Docker + Nginx
+
+Build a tiny container that serves the static files with Nginx. Create a `Dockerfile` (example):
+
+```Dockerfile
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+Then build and run:
+
+```bash
+docker build -t tiny-gantt:prod .
+docker run -p 8080:80 tiny-gantt:prod
+```
+
+Open http://localhost:8080
+
+## Troubleshooting
+
+- Dev server says “Port 5173 in use”: it will pick another port (e.g., 5174). Use the printed URL.
+- Blank UI or missing bars:
+  - Ensure you’re on the Chart view (toggle at top-left)
+  - Dates must be `DD/MM/YYYY`
+  - Try resizing the window; the chart is responsive
+- CSV import not working: check header names and date formats
+
+## Tech stack
+
+- React + TypeScript + Vite
+- Tailwind CSS
+- lucide-react (icons)
 
 ## License
 
@@ -111,4 +223,4 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Feel free to open issues or submit pull requests.
+Issues and PRs welcome!

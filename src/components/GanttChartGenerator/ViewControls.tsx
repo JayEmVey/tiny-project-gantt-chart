@@ -1,6 +1,6 @@
 import React from 'react';
 import { ZoomLevel } from '../../types';
-import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ViewControlsProps {
   zoomLevel: ZoomLevel;

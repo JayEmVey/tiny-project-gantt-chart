@@ -155,22 +155,9 @@ const GanttChartMain: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [projectName, epics, userStories, tasks, milestones]);
 
-  // Filter tasks based on selected epics and user stories
-  const getFilteredTasks = () => {
-    return tasks.filter(task => {
-      // Find the epic for this task
-      const epic = epics.find(e => e.id === task.epicId);
-      if (!epic || !epic.isSelected) return false;
+  // (optional) Filtering helpers for epics/user stories removed as unused in current UI
 
-      // Find the user story for this task
-      const userStory = userStories.find(us => us.id === task.userStoryId);
-      if (!userStory || !userStory.isSelected) return false;
-
-      return true;
-    });
-  };
-
-  const filteredTasks = getFilteredTasks();
+  // const filteredTasks = getFilteredTasks(); // computed on-demand where needed
 
   // Handle New Project
   const handleNewProject = () => {
@@ -252,7 +239,7 @@ const GanttChartMain: React.FC = () => {
   };
 
   // Handle clicking on an empty cell in the chart
-  const handleEmptyCellClick = (date: Date, taskIndex?: number) => {
+  const handleEmptyCellClick = (date: Date, _taskIndex?: number) => {
     const formatDate = (d: Date): string => {
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
