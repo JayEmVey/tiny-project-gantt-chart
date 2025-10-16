@@ -15,6 +15,7 @@ interface GanttChartViewProps {
   onMilestoneClick: (milestone: Milestone) => void;
   onMilestoneDragUpdate: (milestone: Milestone) => void;
   showCriticalPath: boolean;
+  onTaskReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
 interface BarPosition {
@@ -34,12 +35,15 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   onMilestoneCreate,
   onMilestoneClick,
   onMilestoneDragUpdate,
-  showCriticalPath
+  showCriticalPath,
+  onTaskReorder
 }, scrollRef) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [draggedTask, setDraggedTask] = useState<{ task: Task; startX: number } | null>(null);
   const [milestonePreviewPosition, setMilestonePreviewPosition] = useState<number | null>(null);
   const [draggedMilestone, setDraggedMilestone] = useState<{ milestone: Milestone; startX: number; originalPosition: number } | null>(null);
+  const [draggedTaskRowIndex, setDraggedTaskRowIndex] = useState<number | null>(null);
+  const [dropTargetRowIndex, setDropTargetRowIndex] = useState<number | null>(null);
 
   // Generate time columns based on zoom level
   const generateTimeColumns = () => {
@@ -340,6 +344,42 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   const handleTaskMouseDown = (e: React.MouseEvent, task: Task) => {
     e.stopPropagation();
     setDraggedTask({ task, startX: e.clientX });
+  };
+
+  // Task row drag and drop handlers
+  const handleTaskRowDragStart = (e: React.DragEvent, taskIndex: number) => {
+    setDraggedTaskRowIndex(taskIndex);
+    e.dataTransfer.effectAllowed = 'move';
+    // Add visual feedback
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '0.5';
+    }
+  };
+
+  const handleTaskRowDragEnd = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.style.opacity = '1';
+    }
+
+    // Perform the reorder
+    if (draggedTaskRowIndex !== null && dropTargetRowIndex !== null &&
+        draggedTaskRowIndex !== dropTargetRowIndex && onTaskReorder) {
+      onTaskReorder(draggedTaskRowIndex, dropTargetRowIndex);
+    }
+
+    setDraggedTaskRowIndex(null);
+    setDropTargetRowIndex(null);
+  };
+
+  const handleTaskRowDragOver = (e: React.DragEvent, taskIndex: number) => {
+    e.preventDefault();
+    if (draggedTaskRowIndex === null) return;
+    setDropTargetRowIndex(taskIndex);
+  };
+
+  const handleTaskRowDragLeave = () => {
+    // Only clear if we're actually leaving the row
+    setDropTargetRowIndex(null);
   };
 
   useEffect(() => {
@@ -827,18 +867,37 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
               tasks.map((task, taskIndex) => {
                 const barPosition = calculateBarPosition(task.startDate, task.endDate);
                 const colorClass = getTaskColor(task);
+                const isDraggingOver = dropTargetRowIndex === taskIndex;
+                const isDragging = draggedTaskRowIndex === taskIndex;
 
                 return (
-                  <tr key={task.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3.5 h-3.5 bg-blue-600 rounded flex-shrink-0" />
-                          <span className="truncate">{task.process}</span>
-                        </div>
-                        {task.assignee && (
-                          <span className="text-xs text-gray-500 ml-5">{task.assignee}</span>
+                  <tr
+                    key={task.id}
+                    className={`hover:bg-gray-50 transition-colors ${isDraggingOver ? 'border-t-4 border-blue-500' : ''} ${isDragging ? 'opacity-50' : ''}`}
+                    draggable={onTaskReorder !== undefined}
+                    onDragStart={(e) => handleTaskRowDragStart(e, taskIndex)}
+                    onDragEnd={handleTaskRowDragEnd}
+                    onDragOver={(e) => handleTaskRowDragOver(e, taskIndex)}
+                    onDragLeave={handleTaskRowDragLeave}
+                  >
+                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800 cursor-grab active:cursor-grabbing">
+                      <div className="flex items-start gap-2">
+                        {onTaskReorder && (
+                          <div className="flex-shrink-0 text-gray-400 hover:text-gray-600 mt-0.5">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+                            </svg>
+                          </div>
                         )}
+                        <div className="flex flex-col gap-1 flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3.5 h-3.5 bg-blue-600 rounded flex-shrink-0" />
+                            <span className="truncate">{task.process}</span>
+                          </div>
+                          {task.assignee && (
+                            <span className="text-xs text-gray-500 ml-5">{task.assignee}</span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td colSpan={timeColumns.length} className="p-0 relative" style={{ padding: 0 }}>

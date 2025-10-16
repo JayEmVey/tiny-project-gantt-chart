@@ -692,6 +692,7 @@ const GanttChartMain: React.FC = () => {
           onMilestoneClick={handleMilestoneClick}
           onMilestoneDragUpdate={handleMilestoneDragUpdate}
           showCriticalPath={showCriticalPath}
+          onTaskReorder={handleTaskReorder}
         />
       </div>
 
