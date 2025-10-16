@@ -136,9 +136,14 @@ Drag-and-drop the `dist/` folder to Netlify, or connect your repo with the above
 ### Option C: GitHub Pages (via Actions)
 
 1) Ensure your repository is on GitHub
-2) Add a GitHub Actions workflow that builds and publishes `dist/` to `gh-pages`
+2) Ensure Vite base matches your repo name (already set to `/tiny-project-gantt-chart/` in `vite.config.ts`; change it if your repo name differs)
+3) Add the GitHub Actions workflow below at `.github/workflows/deploy.yml`
+4) Commit and push to `main` — the workflow will build and publish your `dist/` to the GitHub Pages environment
+5) In GitHub → Settings → Pages, set "Build and deployment" to "GitHub Actions" (if not already)
 
-Example workflow (optional) placed at `.github/workflows/deploy.yml`:
+Note: The workflow below uses the newer "Pages environment" deployment (no `gh-pages` branch is created). If you specifically want to publish to a `gh-pages` branch, see the alternative snippet further below.
+
+Example workflow (place at `.github/workflows/deploy.yml`):
 
 ```yaml
 name: Deploy to GitHub Pages
@@ -174,6 +179,38 @@ jobs:
 ```
 
 Enable GitHub Pages in your repo settings, “Build and deployment” → “GitHub Actions”.
+
+Alternative (publish to a `gh-pages` branch):
+
+If you prefer a `gh-pages` branch-based deployment, use `peaceiris/actions-gh-pages`. Remove the previous workflow and use this instead:
+
+```yaml
+name: Deploy to gh-pages branch
+on:
+  push:
+    branches: [ main ]
+permissions:
+  contents: write
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          publish_branch: gh-pages
+```
+
+Then set Pages source to the `gh-pages` branch in repo Settings → Pages.
 
 ### Option D: Docker + Nginx
 
