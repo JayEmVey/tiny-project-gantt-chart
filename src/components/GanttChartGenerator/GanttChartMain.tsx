@@ -642,6 +642,60 @@ const GanttChartMain: React.FC = () => {
     setMilestones(milestones.filter(m => m.id !== milestoneId));
   };
 
+  // Handle Epic reorder
+  const handleEpicReorder = (epicId: number, targetEpicId: number) => {
+    const draggedIndex = epics.findIndex(e => e.id === epicId);
+    const targetIndex = epics.findIndex(e => e.id === targetEpicId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newEpics = [...epics];
+    const [draggedEpic] = newEpics.splice(draggedIndex, 1);
+    newEpics.splice(targetIndex, 0, draggedEpic);
+
+    setEpics(newEpics);
+  };
+
+  // Handle User Story reorder
+  const handleUserStoryReorder = (userStoryId: number, targetUserStoryId: number) => {
+    const draggedIndex = userStories.findIndex(us => us.id === userStoryId);
+    const targetIndex = userStories.findIndex(us => us.id === targetUserStoryId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Only allow reordering within the same epic
+    const draggedUserStory = userStories[draggedIndex];
+    const targetUserStory = userStories[targetIndex];
+
+    if (draggedUserStory.epicId !== targetUserStory.epicId) return;
+
+    const newUserStories = [...userStories];
+    const [draggedUS] = newUserStories.splice(draggedIndex, 1);
+    newUserStories.splice(targetIndex, 0, draggedUS);
+
+    setUserStories(newUserStories);
+  };
+
+  // Handle Task reorder
+  const handleTaskReorder = (taskId: number, targetTaskId: number) => {
+    const draggedIndex = tasks.findIndex(t => t.id === taskId);
+    const targetIndex = tasks.findIndex(t => t.id === targetTaskId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Only allow reordering within the same user story
+    const draggedTask = tasks[draggedIndex];
+    const targetTask = tasks[targetIndex];
+
+    if (draggedTask.userStoryId !== targetTask.userStoryId) return;
+
+    const newTasks = [...tasks];
+    const [draggedT] = newTasks.splice(draggedIndex, 1);
+    newTasks.splice(targetIndex, 0, draggedT);
+
+    setTasks(newTasks);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
@@ -696,6 +750,9 @@ const GanttChartMain: React.FC = () => {
             onCloneEpic={handleCloneEpic}
             onDeleteEpic={handleDeleteEpic}
             onToggleAllEpics={handleToggleAllEpics}
+            onEpicReorder={handleEpicReorder}
+            onUserStoryReorder={handleUserStoryReorder}
+            onTaskReorder={handleTaskReorder}
           />
         )}
 

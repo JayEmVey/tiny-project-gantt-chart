@@ -4,11 +4,17 @@ A tiny, fast, and interactive Gantt chart for project timelines. Built with Reac
 
 ## ✨ What's inside (current)
 
-- Pink-themed, modern UI/UX
+- Modern, responsive UI/UX with hierarchical task organization
+- **Drag and Drop:** Reorder Epics, User Stories, and Tasks in the sidebar
 - Interactive Gantt bars: drag to move, resize from edges
+- Epic/User Story/Task hierarchy with visual indicators
 - Modal editing with date pickers (DD/MM/YYYY)
-- CSV import/export (simple, human-friendly format)
-- Toggle between Chart and Edit views
+- Project save/load functionality (.json format)
+- PNG and PDF export with customizable views
+- Multiple zoom levels (Day, Week, Month, Quarter)
+- Milestone support with visual markers
+- Critical path visualization
+- Keyboard shortcuts (Ctrl+S to save, Ctrl+/- to zoom)
 - Lightweight and responsive
 
 ## Preview
@@ -40,10 +46,180 @@ The dev server prints a URL like http://localhost:5173 or http://localhost:5174.
 
 ## Scripts
 
+### Development
 - `npm run dev` – start Vite dev server
 - `npm run build` – build the production bundle to `dist/`
 - `npm run preview` – serve the production build locally
 - `npm run lint` – run ESLint
+
+### Testing
+- `npm test` – run all automated tests
+- `npm run test:ui` – run tests in interactive UI mode
+- `npm run test:headed` – run tests in headed browser mode
+- `npm run test:chromium` – run tests only in Chromium
+- `npm run test:firefox` – run tests only in Firefox
+- `npm run test:webkit` – run tests only in WebKit (Safari)
+- `npm run test:functional` – run functional tests only
+- `npm run test:ux` – run UX tests only
+- `npm run test:performance` – run performance tests only
+- `npm run test:accessibility` – run accessibility tests only
+- `npm run test:report` – view the last test report
+
+## Testing
+
+This project includes comprehensive automated testing using Playwright to ensure functionality and user experience quality.
+
+**📚 Quick Links:**
+- [TESTING_GUIDE.md](TESTING_GUIDE.md) - Comprehensive testing guide
+- [TEST_SUMMARY.md](TEST_SUMMARY.md) - Quick overview of what was added
+
+### Automated Testing (Recommended)
+
+We use [Playwright](https://playwright.dev/) for end-to-end testing, which tests the application as a real user would interact with it.
+
+#### Quick Start
+
+Run all tests:
+```bash
+npm test
+```
+
+Run tests in interactive UI mode (recommended for development):
+```bash
+npm run test:ui
+```
+
+Run tests in headed mode (see the browser):
+```bash
+npm run test:headed
+```
+
+#### Test Suites
+
+Our automated tests cover four key areas:
+
+**1. Functional Tests** ([tests/functional.spec.ts](tests/functional.spec.ts))
+- Creating Epics, User Stories, and Tasks
+- Saving and loading projects
+- Toggling between views
+- Zoom and navigation controls
+- Export functionality (PNG/PDF)
+- Keyboard shortcuts
+
+Run with:
+```bash
+npm run test:functional
+```
+
+**2. UX Tests** ([tests/ux.spec.ts](tests/ux.spec.ts))
+- Responsive design (mobile, tablet, desktop)
+- Drag and drop interactions
+- Tooltips and user feedback
+- Mouse and keyboard interactions
+- Visual hierarchy and consistency
+- Error handling
+
+Run with:
+```bash
+npm run test:ux
+```
+
+**3. Performance Tests** ([tests/performance.spec.ts](tests/performance.spec.ts))
+- Page load time
+- Render performance
+- Smooth scrolling
+- Zoom operation efficiency
+- Handling multiple tasks
+- Bundle size optimization
+
+Run with:
+```bash
+npm run test:performance
+```
+
+**4. Accessibility Tests** ([tests/accessibility.spec.ts](tests/accessibility.spec.ts))
+- Keyboard navigation
+- Screen reader support
+- Focus indicators
+- Color contrast
+- Semantic HTML
+- ARIA roles and labels
+
+Run with:
+```bash
+npm run test:accessibility
+```
+
+#### Browser-Specific Testing
+
+Test on specific browsers:
+```bash
+npm run test:chromium   # Chrome/Edge
+npm run test:firefox    # Firefox
+npm run test:webkit     # Safari
+```
+
+#### View Test Reports
+
+After running tests, view the HTML report:
+```bash
+npm run test:report
+```
+
+### Running Tests from Terminal
+
+The simplest way to run tests:
+
+1. **Run all tests** (Playwright will automatically start the dev server):
+   ```bash
+   npm test
+   ```
+
+2. **Run tests in UI mode** (best for debugging):
+   ```bash
+   npm run test:ui
+   ```
+
+3. **View the results**:
+   - Tests will output results in the terminal
+   - HTML report is generated in `playwright-report/`
+   - Screenshots and videos are saved on failure in `test-results/`
+
+### Continuous Integration
+
+Tests are configured to run automatically in CI environments. The test suite will:
+- Run in headless mode
+- Retry failed tests up to 2 times
+- Generate HTML and JSON reports
+- Capture screenshots and videos on failure
+
+### Manual UI/UX Testing
+
+For manual testing, see:
+- **Quick Start:** [TESTING_QUICK_START.md](TESTING_QUICK_START.md) for a 5-minute smoke test
+- **Full Test Suite:** [TEST_CASES.md](TEST_CASES.md) for detailed manual test scenarios
+
+### Quick Smoke Test (Manual)
+
+To quickly verify the application is working manually:
+
+```bash
+# Terminal 1: Start dev server
+npm run dev
+
+# Terminal 2: Run build to check for TypeScript errors
+npm run build
+```
+
+Then in the browser:
+1. ✅ Create an Epic, User Story, and Task
+2. ✅ Drag and drop items to reorder them
+3. ✅ Drag a task bar in the Gantt chart
+4. ✅ Save the project (Ctrl+S)
+5. ✅ Export as PNG
+6. ✅ Reload and load the saved project
+
+All core features should work without errors.
 
 ## Project Structure (key files)
 
@@ -79,15 +255,36 @@ export interface Task {
 
 ## Using the app
 
-- Edit vs Chart view: use the top-left button to toggle
-- In Edit view:
-  - Change process name or adjust start/end via date pickers
-  - Add rows (Add Process) or delete rows
-- In Chart view:
-  - Drag a bar to move dates
-  - Drag edges to resize
-  - Click a bar to open the edit modal
-- Import/Export CSV to move data around
+### Sidebar (Task List)
+- **Add Items:** Click the "+" button to create new Epics, User Stories, or Tasks
+- **Expand/Collapse:** Click the chevron icon next to items to show/hide children
+- **Drag and Drop:** Click and drag any Epic, User Story, or Task to reorder them
+  - Epics can be reordered freely
+  - User Stories can be reordered within the same Epic
+  - Tasks can be reordered within the same User Story
+- **Select/Deselect:** Check/uncheck items to show/hide them in the Gantt chart
+- **Edit:** Double-click any item to open the edit modal
+- **Clone/Delete:** Select items and use the clone/delete buttons in the header
+
+### Gantt Chart View
+- **Drag Task Bars:** Click and drag task bars to change dates
+- **Resize Bars:** Drag the left or right edge to change start/end dates
+- **Click Bar:** Click a task bar to open the edit modal
+- **Click Empty Cell:** Click an empty area to create a new task at that date
+- **Zoom:** Use Day/Week/Month/Quarter buttons to change timeline scale
+- **Navigate:** Use arrow buttons or "Today" button to navigate the timeline
+
+### Project Management
+- **Save Project:** Press Ctrl+S (Cmd+S on Mac) or use File → Save Project
+- **Open Project:** Use File → Open Project to load a .json project file
+- **New Project:** Use File → New Project to start fresh
+- **Export:** Click Export to download as PNG or PDF
+
+### Keyboard Shortcuts
+- `Ctrl+S` / `Cmd+S` – Save project
+- `Ctrl++` / `Cmd++` – Zoom in
+- `Ctrl+-` / `Cmd+-` – Zoom out
+- `Ctrl+0` / `Cmd+0` – Reset zoom
 
 ### CSV format
 
