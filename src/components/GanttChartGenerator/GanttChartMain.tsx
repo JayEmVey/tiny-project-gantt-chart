@@ -95,6 +95,7 @@ const GanttChartMain: React.FC = () => {
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
+  const [zoomScale, setZoomScale] = useState<number>(1.0); // 0.25 to 3.0
   const [viewType, setViewType] = useState<ViewType>('task');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
@@ -143,12 +144,21 @@ const GanttChartMain: React.FC = () => {
     }
   }, [projectName, epics, userStories, tasks, milestones, lastSavedState]);
 
-  // Add keyboard shortcut for save (Ctrl+S / Cmd+S)
+  // Add keyboard shortcuts for save (Ctrl+S / Cmd+S) and zoom (Ctrl/Cmd + Plus/Minus/0)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSaveProject();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        handleZoomIn();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        handleZoomOut();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        handleResetZoom();
       }
     };
 
@@ -409,6 +419,21 @@ const GanttChartMain: React.FC = () => {
     ganttScrollRef.current.scrollBy({ left: ganttScrollRef.current.clientWidth * 0.5, behavior: 'smooth' });
   };
 
+  // Handle zoom in
+  const handleZoomIn = () => {
+    setZoomScale(prev => Math.min(3.0, prev + 0.1));
+  };
+
+  // Handle zoom out
+  const handleZoomOut = () => {
+    setZoomScale(prev => Math.max(0.25, prev - 0.1));
+  };
+
+  // Handle reset zoom
+  const handleResetZoom = () => {
+    setZoomScale(1.0);
+  };
+
   // Handle Epic toggle
   const handleEpicToggle = (epicId: number) => {
     const epic = epics.find(e => e.id === epicId);
@@ -629,6 +654,10 @@ const GanttChartMain: React.FC = () => {
       <ViewControls
         zoomLevel={zoomLevel}
         onZoomChange={setZoomLevel}
+        zoomScale={zoomScale}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onResetZoom={handleResetZoom}
         viewType={viewType}
         onViewTypeChange={setViewType}
         showCriticalPath={showCriticalPath}
@@ -685,6 +714,7 @@ const GanttChartMain: React.FC = () => {
           userStories={userStories}
           milestones={milestones}
           zoomLevel={zoomLevel}
+          zoomScale={zoomScale}
           viewType={viewType}
           onTaskClick={handleTaskClick}
           onEpicClick={handleEditEpic}

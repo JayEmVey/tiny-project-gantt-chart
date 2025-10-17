@@ -8,6 +8,7 @@ interface GanttChartViewProps {
   userStories?: UserStory[];
   milestones: Milestone[];
   zoomLevel: ZoomLevel;
+  zoomScale?: number;
   viewType?: ViewType;
   onTaskClick: (task: Task) => void;
   onEpicClick?: (epic: Epic) => void;
@@ -31,6 +32,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
   userStories = [],
   milestones,
   zoomLevel,
+  zoomScale = 1.0,
   viewType = 'task',
   onTaskClick,
   onEpicClick,
@@ -619,8 +621,40 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
     }
   }, [draggedMilestone, milestonePreviewPosition, timeColumns, onMilestoneDragUpdate]);
 
+  // Scroll to current day when zoom level or view type changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!scrollRef || typeof scrollRef === 'function') return;
+      const scrollElement = scrollRef.current;
+      if (!scrollElement) return;
+
+      const today = new Date();
+      const yearStart = new Date(today.getFullYear(), 0, 1);
+      let todayIndex = 0;
+
+      if (zoomLevel === 'day') {
+        todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+      } else if (zoomLevel === 'week') {
+        todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      } else if (zoomLevel === 'month') {
+        todayIndex = today.getMonth();
+      } else if (zoomLevel === 'quarter') {
+        todayIndex = Math.floor(today.getMonth() / 3);
+      }
+
+      // Calculate scroll position to center today
+      const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4;
+      const scrollAmount = (todayIndex / totalColumns) * scrollElement.scrollWidth;
+      scrollElement.scrollTo({ left: scrollAmount - scrollElement.clientWidth / 2, behavior: 'smooth' });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [zoomLevel, viewType, scrollRef]);
+
   return (
-    <div ref={scrollRef} className="flex-1 overflow-auto bg-gray-50">
+    <div ref={scrollRef} className="flex-1 overflow-auto bg-gray-50" style={{
+      zoom: zoomScale
+    }}>
       <div
         ref={chartRef}
         className="min-w-max relative"
@@ -630,10 +664,10 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
         onClick={handleChartClick}
       >
         <table className="w-full border-collapse">
-          <thead className="sticky top-0 z-30">
+          <thead className="sticky top-0 z-40 bg-white">
             {/* Milestone Header Row */}
             <tr className="relative h-8">
-              <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 w-64">
+              <th className="sticky left-0 z-50 bg-white border-2 border-gray-800 w-64">
                 {/* Empty cell for task names column */}
               </th>
               <th colSpan={timeColumns.length} className="border-2 border-gray-800 p-0 relative bg-white">
@@ -699,7 +733,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {/* Year + Month Row (for day view) */}
             {zoomLevel === 'day' && monthGroups.length > 0 && (
               <tr>
-                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                <th className="sticky left-0 z-50 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {/* Empty cell for task names column */}
                 </th>
                 {monthGroups.map((group, idx) => (
@@ -717,7 +751,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {/* Quarter Row (for week view) */}
             {zoomLevel === 'week' && quarterGroups.length > 0 && (
               <tr>
-                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                <th className="sticky left-0 z-50 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {/* Empty cell for task names column */}
                 </th>
                 {quarterGroups.map((group, idx) => (
@@ -735,7 +769,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {/* Year Row (for month and quarter view) */}
             {(zoomLevel === 'month' || zoomLevel === 'quarter') && (
               <tr>
-                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                <th className="sticky left-0 z-50 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {/* Empty cell for task names column */}
                 </th>
                 <th
@@ -750,7 +784,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {/* Day of Week + Day Number Row (for day view) */}
             {zoomLevel === 'day' && (
               <tr>
-                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                <th className="sticky left-0 z-50 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {shouldShowEpics ? 'Epic' : shouldShowUserStories ? 'User Story' : 'Task'}
                 </th>
                 {timeColumns.map((column: any, idx) => (
@@ -772,7 +806,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {/* Week Number Row (for week view) */}
             {zoomLevel === 'week' && (
               <tr>
-                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                <th className="sticky left-0 z-50 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {shouldShowEpics ? 'Epic' : shouldShowUserStories ? 'User Story' : 'Task'}
                 </th>
                 {timeColumns.map((column, idx) => (
@@ -789,7 +823,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             {/* Month/Quarter Row (for month and quarter view) */}
             {(zoomLevel === 'month' || zoomLevel === 'quarter') && (
               <tr>
-                <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
+                <th className="sticky left-0 z-50 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {shouldShowEpics ? 'Epic' : shouldShowUserStories ? 'User Story' : 'Task'}
                 </th>
                 {timeColumns.map((column, idx) => (
@@ -812,7 +846,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
 
                 return (
                   <tr key={epic.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
+                    <td className="sticky left-0 z-30 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#9A4D99' }} />
@@ -940,7 +974,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
 
                 return (
                   <tr key={userStory.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
+                    <td className="sticky left-0 z-30 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#00694C' }} />
@@ -1078,7 +1112,7 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                     onDragOver={(e) => handleTaskRowDragOver(e, taskIndex)}
                     onDragLeave={handleTaskRowDragLeave}
                   >
-                    <td className="sticky left-0 z-10 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800 cursor-grab active:cursor-grabbing">
+                    <td className="sticky left-0 z-30 bg-white border-2 border-gray-300 p-3 font-medium text-gray-800 cursor-grab active:cursor-grabbing">
                       <div className="flex items-start gap-2">
                         {onTaskReorder && (
                           <div className="flex-shrink-0 text-gray-400 hover:text-gray-600 mt-0.5">

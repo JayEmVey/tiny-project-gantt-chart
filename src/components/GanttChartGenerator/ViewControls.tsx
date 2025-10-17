@@ -1,10 +1,14 @@
 import React from 'react';
 import { ZoomLevel, ViewType } from '../../types';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ViewControlsProps {
   zoomLevel: ZoomLevel;
   onZoomChange: (level: ZoomLevel) => void;
+  zoomScale: number;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onResetZoom: () => void;
   viewType: ViewType;
   onViewTypeChange: (type: ViewType) => void;
   showCriticalPath: boolean;
@@ -17,6 +21,10 @@ interface ViewControlsProps {
 const ViewControls: React.FC<ViewControlsProps> = ({
   zoomLevel,
   onZoomChange,
+  zoomScale,
+  onZoomIn,
+  onZoomOut,
+  onResetZoom,
   viewType,
   onViewTypeChange,
   showCriticalPath,
@@ -76,7 +84,7 @@ const ViewControls: React.FC<ViewControlsProps> = ({
 
         {/* Bottom Controls */}
         <div className="flex items-center gap-4">
-          {/* Zoom Controls */}
+          {/* Critical Path Toggle */}
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -87,6 +95,33 @@ const ViewControls: React.FC<ViewControlsProps> = ({
               />
               <span className="text-gray-700 font-medium">Critical Path</span>
             </label>
+          </div>
+
+          {/* Zoom Scale Controls */}
+          <div className="flex items-center gap-2 border-2 border-gray-800 rounded-lg overflow-hidden">
+            <button
+              onClick={onZoomOut}
+              disabled={zoomScale <= 0.25}
+              className="p-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Zoom out (Ctrl/Cmd + -)"
+            >
+              <ZoomOut className="w-5 h-5" strokeWidth={2} />
+            </button>
+            <button
+              onClick={onResetZoom}
+              className="px-3 py-2 hover:bg-gray-50 transition-colors border-x-2 border-gray-800 font-medium text-sm min-w-[60px]"
+              title="Reset zoom (Ctrl/Cmd + 0)"
+            >
+              {Math.round(zoomScale * 100)}%
+            </button>
+            <button
+              onClick={onZoomIn}
+              disabled={zoomScale >= 3.0}
+              className="p-2 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Zoom in (Ctrl/Cmd + +)"
+            >
+              <ZoomIn className="w-5 h-5" strokeWidth={2} />
+            </button>
           </div>
 
           {/* Navigation Controls */}

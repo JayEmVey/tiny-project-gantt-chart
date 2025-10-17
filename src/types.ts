@@ -73,6 +73,9 @@ export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter'
 
 export type ViewType = 'task' | 'user-story' | 'epic'
 
+// Zoom scale factor (0.25x to 3.0x)
+export type ZoomScale = number
+
 export interface Dependency {
   fromTaskId: number
   toTaskId: number
