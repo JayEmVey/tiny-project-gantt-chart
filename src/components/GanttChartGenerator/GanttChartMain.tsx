@@ -99,6 +99,21 @@ const GanttChartMain: React.FC = () => {
   const [viewType, setViewType] = useState<ViewType>('task');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
+  // Global font size option: larger | medium | smaller
+  const [fontSizeOption, setFontSizeOption] = useState<'larger' | 'medium' | 'smaller'>(() => {
+    const saved = localStorage.getItem('app-font-size-option');
+    if (saved === 'larger' || saved === 'medium' || saved === 'smaller') return saved;
+    return 'medium'; // default
+  });
+
+  // Apply font size to :root via CSS variable
+  useEffect(() => {
+    const root = document.documentElement;
+    // Larger = 14px, Medium = 12px (default), Smaller = 10px
+    const sizePx = fontSizeOption === 'larger' ? '14px' : fontSizeOption === 'smaller' ? '10px' : '12px';
+    root.style.setProperty('--app-font-size', sizePx);
+    localStorage.setItem('app-font-size-option', fontSizeOption);
+  }, [fontSizeOption]);
 
   const chartRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
@@ -121,12 +136,10 @@ const GanttChartMain: React.FC = () => {
         todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
       } else if (zoomLevel === 'month') {
         todayIndex = today.getMonth();
-      } else if (zoomLevel === 'quarter') {
-        todayIndex = Math.floor(today.getMonth() / 3);
       }
 
       // Calculate scroll position to center today
-      const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4;
+      const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : 12;
       const scrollAmount = (todayIndex / totalColumns) * ganttScrollRef.current.scrollWidth;
       ganttScrollRef.current.scrollTo({ left: scrollAmount - ganttScrollRef.current.clientWidth / 2, behavior: 'smooth' });
     }, 500);
@@ -293,14 +306,6 @@ const GanttChartMain: React.FC = () => {
   // Handle deleting a task
   const handleDeleteTask = (taskId: number) => {
     setTasks(tasks.filter(t => t.id !== taskId));
-  };
-
-  // Handle reordering tasks via drag and drop in the task list
-  const handleTaskReorder = (fromIndex: number, toIndex: number) => {
-    const newTasks = [...tasks];
-    const [movedTask] = newTasks.splice(fromIndex, 1);
-    newTasks.splice(toIndex, 0, movedTask);
-    setTasks(newTasks);
   };
 
   // Handle task drag in chart (changing dates)
@@ -648,6 +653,10 @@ const GanttChartMain: React.FC = () => {
         projectName={projectName}
         onProjectNameChange={setProjectName}
         hasUnsavedChanges={hasUnsavedChanges}
+        fontSizeOption={fontSizeOption}
+        onFontSizeChange={setFontSizeOption}
+        viewType={viewType}
+        onViewTypeChange={setViewType}
       />
 
       {/* View Controls */}
@@ -677,7 +686,6 @@ const GanttChartMain: React.FC = () => {
             userStories={userStories}
             onAddTask={handleAddTask}
             onTaskClick={handleTaskClick}
-            onTaskReorder={handleTaskReorder}
             onEpicToggle={handleEpicToggle}
             onUserStoryToggle={handleUserStoryToggle}
             onAddEpic={handleAddEpic}
@@ -724,7 +732,6 @@ const GanttChartMain: React.FC = () => {
           onMilestoneClick={handleMilestoneClick}
           onMilestoneDragUpdate={handleMilestoneDragUpdate}
           showCriticalPath={showCriticalPath}
-          onTaskReorder={handleTaskReorder}
         />
       </div>
 

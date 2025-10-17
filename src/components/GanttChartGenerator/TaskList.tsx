@@ -8,7 +8,6 @@ interface TaskListProps {
   userStories: UserStory[];
   onAddTask: () => void;
   onTaskClick: (task: Task) => void;
-  onTaskReorder: (fromIndex: number, toIndex: number) => void;
   onEpicToggle: (epicId: number) => void;
   onUserStoryToggle: (userStoryId: number) => void;
   onAddEpic: () => void;
@@ -27,7 +26,6 @@ const TaskList: React.FC<TaskListProps> = ({
   userStories,
   onAddTask,
   onTaskClick,
-  onTaskReorder: _onTaskReorder,
   onEpicToggle,
   onUserStoryToggle,
   onAddEpic,
@@ -41,10 +39,8 @@ const TaskList: React.FC<TaskListProps> = ({
 }) => {
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set());
   const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set());
-  // const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
-  // const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  // const [isDragging, setIsDragging] = useState(false); // currently unused
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [isAllExpanded, setIsAllExpanded] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
 
   // Get selected epics
@@ -148,11 +144,22 @@ const TaskList: React.FC<TaskListProps> = ({
     return tasks.filter(task => task.userStoryId === userStoryId);
   };
 
-  // Drag handlers not currently wired in UI
-  // const handleDragStart = (e: React.DragEvent, index: number) => { /* ... */ };
-  // const handleDragEnd = (e: React.DragEvent) => { /* ... */ };
-  // const handleDragOver = (e: React.DragEvent, index: number) => { /* ... */ };
-  // const handleDragLeave = () => { /* ... */ };
+  // Placeholder for future handlers if needed
+
+  const handleToggleAll = () => {
+    if (isAllExpanded) {
+      // Collapse all
+      setExpandedEpics(new Set());
+      setExpandedUserStories(new Set());
+    } else {
+      // Expand all
+      const allEpics = new Set(epics.map(epic => epic.id));
+      const allUserStories = new Set(userStories.map(story => story.id));
+      setExpandedEpics(allEpics);
+      setExpandedUserStories(allUserStories);
+    }
+    setIsAllExpanded(!isAllExpanded);
+  };
 
   return (
     <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
@@ -161,6 +168,17 @@ const TaskList: React.FC<TaskListProps> = ({
         {/* Top Row: Add, Clone, Delete, Collapse */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleToggleAll}
+              className="flex items-center justify-center p-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+              title={isAllExpanded ? "Collapse all" : "Expand all"}
+            >
+              {isAllExpanded ? (
+                <ChevronRight className="w-5 h-5" strokeWidth={2} />
+              ) : (
+                <ChevronDown className="w-5 h-5" strokeWidth={2} />
+              )}
+            </button>
             <button
               onClick={() => setShowAddMenu(!showAddMenu)}
               className="flex items-center justify-center p-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
@@ -255,7 +273,10 @@ const TaskList: React.FC<TaskListProps> = ({
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-0">
           {epics.map((epic) => (
-            <div key={epic.id} className="border-b border-gray-200">
+            <div 
+              key={epic.id} 
+              className="border-b border-gray-200"
+            >
               {/* Epic Level */}
               <div
                 className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer"
@@ -310,7 +331,8 @@ const TaskList: React.FC<TaskListProps> = ({
                           if (onUserStoryClick) {
                             onUserStoryClick(userStory);
                           }
-                        }}
+                        }
+                        }
                       >
                         <input
                           type="checkbox"

@@ -9,6 +9,10 @@ interface HeaderProps {
   projectName?: string;
   onProjectNameChange?: (name: string) => void;
   hasUnsavedChanges?: boolean;
+  fontSizeOption?: 'larger' | 'medium' | 'smaller';
+  onFontSizeChange?: (opt: 'larger' | 'medium' | 'smaller') => void;
+  viewType?: 'task' | 'user-story' | 'epic';
+  onViewTypeChange?: (type: 'task' | 'user-story' | 'epic') => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -18,12 +22,18 @@ const Header: React.FC<HeaderProps> = ({
   onNewProject,
   projectName = 'Untitled Project',
   onProjectNameChange,
-  hasUnsavedChanges = false
+  hasUnsavedChanges = false,
+  fontSizeOption = 'medium',
+  onFontSizeChange,
+  viewType = 'task',
+  onViewTypeChange
 }) => {
   const [showProjectMenu, setShowProjectMenu] = useState(false);
+  const [showViewMenu, setShowViewMenu] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(projectName);
   const menuRef = useRef<HTMLDivElement>(null);
+  const viewMenuRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Update editedName when projectName changes
@@ -44,6 +54,9 @@ const Header: React.FC<HeaderProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowProjectMenu(false);
+      }
+      if (viewMenuRef.current && !viewMenuRef.current.contains(event.target as Node)) {
+        setShowViewMenu(false);
       }
     };
 
@@ -79,51 +92,107 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Projects Dropdown - Moved to the left */}
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={() => setShowProjectMenu(!showProjectMenu)}
-            className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
-          >
-            <span className="text-xl">Projects</span>
-            <ChevronDown className="w-5 h-5" />
-          </button>
+        {/* Menus */}
+        <div className="flex items-center gap-4">
+          {/* Projects Dropdown */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowProjectMenu(!showProjectMenu)}
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+            >
+              <span className="text-xl">Projects</span>
+              <ChevronDown className="w-5 h-5" />
+            </button>
 
-          {/* Dropdown Menu */}
-          {showProjectMenu && (
-            <div className="absolute top-full left-0 mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden min-w-[200px]">
-              <button
-                onClick={() => {
-                  onNewProject();
-                  setShowProjectMenu(false);
-                }}
-                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-200 flex items-center gap-3"
-              >
-                <FilePlus className="w-5 h-5" />
-                <span className="font-medium">New Project</span>
-              </button>
-              <button
-                onClick={() => {
-                  onSaveProject();
-                  setShowProjectMenu(false);
-                }}
-                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-200 flex items-center gap-3"
-              >
-                <Save className="w-5 h-5" />
-                <span className="font-medium">Save Project</span>
-              </button>
-              <button
-                onClick={() => {
-                  onOpenProject();
-                  setShowProjectMenu(false);
-                }}
-                className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
-              >
-                <FolderOpen className="w-5 h-5" />
-                <span className="font-medium">Open Project</span>
-              </button>
-            </div>
-          )}
+            {showProjectMenu && (
+              <div className="absolute top-full left-0 mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden min-w-[200px]">
+                <button
+                  onClick={() => {
+                    onNewProject();
+                    setShowProjectMenu(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-200 flex items-center gap-3"
+                >
+                  <FilePlus className="w-5 h-5" />
+                  <span className="font-medium">New Project</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onSaveProject();
+                    setShowProjectMenu(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-200 flex items-center gap-3"
+                >
+                  <Save className="w-5 h-5" />
+                  <span className="font-medium">Save Project</span>
+                </button>
+                <button
+                  onClick={() => {
+                    onOpenProject();
+                    setShowProjectMenu(false);
+                  }}
+                  className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center gap-3"
+                >
+                  <FolderOpen className="w-5 h-5" />
+                  <span className="font-medium">Open Project</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* View / Font Size Dropdown */}
+          <div className="relative" ref={viewMenuRef}>
+            <button
+              onClick={() => setShowViewMenu(!showViewMenu)}
+              className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-gray-900 font-medium"
+            >
+              <span className="text-xl">View</span>
+              <ChevronDown className="w-5 h-5" />
+            </button>
+            {showViewMenu && (
+              <div className="absolute top-full left-0 mt-2 bg-white border-2 border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden min-w-[220px]">
+                {/* Font Size Section */}
+                <div className="px-4 py-2 text-xs text-gray-500 border-b">Font Size</div>
+                {(['larger','medium','smaller'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => {
+                      onFontSizeChange && onFontSizeChange(opt);
+                      setShowViewMenu(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${fontSizeOption === opt ? 'bg-gray-50' : ''}`}
+                  >
+                    <span className="font-medium capitalize">{opt}</span>
+                    {fontSizeOption === opt && (
+                      <Check className="w-4 h-4 text-blue-600" />
+                    )}
+                  </button>
+                ))}
+
+                {/* Item View Section */}
+                <div className="mt-2 px-4 py-2 text-xs text-gray-500 border-b border-t">Item View</div>
+                {[
+                  { value: 'task', label: 'Task' },
+                  { value: 'user-story', label: 'User Story' },
+                  { value: 'epic', label: 'Epic' }
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => {
+                      onViewTypeChange && onViewTypeChange(value as 'task' | 'user-story' | 'epic');
+                      setShowViewMenu(false);
+                    }}
+                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${viewType === value ? 'bg-gray-50' : ''}`}
+                  >
+                    <span className="font-medium">{label}</span>
+                    {viewType === value && (
+                      <Check className="w-4 h-4 text-blue-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Project Name Display */}

@@ -3,14 +3,14 @@ import { ZoomLevel, ViewType } from '../../types';
 import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface ViewControlsProps {
+  viewType: ViewType;
+  onViewTypeChange: (type: ViewType) => void;
   zoomLevel: ZoomLevel;
   onZoomChange: (level: ZoomLevel) => void;
   zoomScale: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;
-  viewType: ViewType;
-  onViewTypeChange: (type: ViewType) => void;
   showCriticalPath: boolean;
   onToggleCriticalPath: (show: boolean) => void;
   onNavigateLeft?: () => void;
@@ -19,26 +19,25 @@ interface ViewControlsProps {
 }
 
 const ViewControls: React.FC<ViewControlsProps> = ({
+  viewType,
+  onViewTypeChange,
   zoomLevel,
   onZoomChange,
   zoomScale,
   onZoomIn,
   onZoomOut,
   onResetZoom,
-  viewType,
-  onViewTypeChange,
   showCriticalPath,
   onToggleCriticalPath,
   onNavigateLeft,
   onNavigateRight,
   onNavigateToToday
 }) => {
-  const zoomLevels: ZoomLevel[] = ['day', 'week', 'month', 'quarter'];
   const viewTypes: ViewType[] = ['task', 'user-story', 'epic'];
+  const zoomLevels: ZoomLevel[] = ['day', 'week', 'month'];
 
   const formatViewType = (type: ViewType): string => {
-    if (type === 'user-story') return 'User Story';
-    return type.charAt(0).toUpperCase() + type.slice(1);
+    return type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
   return (
