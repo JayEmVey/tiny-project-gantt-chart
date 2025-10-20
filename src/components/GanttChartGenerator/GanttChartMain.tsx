@@ -9,6 +9,7 @@ import MilestoneModal from './MilestoneModal';
 import ExportModal, { ExportOptions } from './ExportModal';
 import ViewControls from './ViewControls';
 import GanttChartView from './GanttChartView';
+import WxGanttChartView from './WxGanttChartView';
 import { saveProjectToFile, openProjectFile, saveProjectToLocalStorage, loadProjectFromLocalStorage, getLastSavedTimestamp } from '../../utils/projectFileHandler';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -99,6 +100,7 @@ const GanttChartMain: React.FC = () => {
   const [viewType, setViewType] = useState<ViewType>('task');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
+  const [useWxGantt, setUseWxGantt] = useState(true); // Toggle between original and wx-react-gantt view
   // Global font size option: larger | medium | smaller
   const [fontSizeOption, setFontSizeOption] = useState<'larger' | 'medium' | 'smaller'>(() => {
     const saved = localStorage.getItem('app-font-size-option');
@@ -983,6 +985,8 @@ const GanttChartMain: React.FC = () => {
         onNavigateLeft={handleNavigateLeft}
         onNavigateRight={handleNavigateRight}
         onNavigateToToday={handleNavigateToToday}
+        useWxGantt={useWxGantt}
+        onToggleWxGantt={setUseWxGantt}
       />
 
       {/* Main Content: Task List + Gantt Chart */}
@@ -1030,24 +1034,41 @@ const GanttChartMain: React.FC = () => {
         )}
 
         {/* Gantt Chart View */}
-        <GanttChartView
-          ref={ganttScrollRef}
-          tasks={tasks}
-          epics={epics}
-          userStories={userStories}
-          milestones={milestones}
-          zoomLevel={zoomLevel}
-          zoomScale={zoomScale}
-          viewType={viewType}
-          onTaskClick={handleTaskClick}
-          onEpicClick={handleEditEpic}
-          onEmptyCellClick={handleEmptyCellClick}
-          onTaskDragInChart={handleTaskDragInChart}
-          onMilestoneCreate={handleMilestoneCreate}
-          onMilestoneClick={handleMilestoneClick}
-          onMilestoneDragUpdate={handleMilestoneDragUpdate}
-          showCriticalPath={showCriticalPath}
-        />
+        {useWxGantt ? (
+          <div className="flex-1 overflow-hidden">
+            <WxGanttChartView
+              tasks={tasks}
+              epics={epics}
+              userStories={userStories}
+              milestones={milestones}
+              zoomLevel={zoomLevel}
+              viewType={viewType}
+              onTaskClick={handleTaskClick}
+              onTaskUpdate={handleSaveTask}
+              onEpicClick={handleEditEpic}
+              showCriticalPath={showCriticalPath}
+            />
+          </div>
+        ) : (
+          <GanttChartView
+            ref={ganttScrollRef}
+            tasks={tasks}
+            epics={epics}
+            userStories={userStories}
+            milestones={milestones}
+            zoomLevel={zoomLevel}
+            zoomScale={zoomScale}
+            viewType={viewType}
+            onTaskClick={handleTaskClick}
+            onEpicClick={handleEditEpic}
+            onEmptyCellClick={handleEmptyCellClick}
+            onTaskDragInChart={handleTaskDragInChart}
+            onMilestoneCreate={handleMilestoneCreate}
+            onMilestoneClick={handleMilestoneClick}
+            onMilestoneDragUpdate={handleMilestoneDragUpdate}
+            showCriticalPath={showCriticalPath}
+          />
+        )}
       </div>
 
       {/* Task Modal */}

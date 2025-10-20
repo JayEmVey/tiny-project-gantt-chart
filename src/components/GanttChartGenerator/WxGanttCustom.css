@@ -1,0 +1,250 @@
+/**
+ * Custom styling for wx-react-gantt to match the application's UI/UX design
+ */
+
+/* Ensure the Gantt container has proper height */
+.gantt-container {
+  height: 100%;
+  width: 100%;
+  min-height: 400px;
+}
+
+/* Override default wx-gantt styling */
+.wx-gantt-wrapper {
+  --wx-gantt-primary-color: #1f2937;
+  --wx-gantt-secondary-color: #f3f4f6;
+  --wx-gantt-border-color: #e5e7eb;
+  --wx-gantt-text-color: #374151;
+  --wx-gantt-header-bg: #ffffff;
+  --wx-gantt-row-height: 38px;
+}
+
+/* Customize Gantt container */
+.wx-gantt-wrapper .wx-gantt {
+  font-family: inherit;
+  border: none;
+}
+
+/* Grid styling */
+.wx-gantt-wrapper .wx-grid {
+  border: 2px solid #1f2937;
+}
+
+/* Header styling */
+.wx-gantt-wrapper .wx-grid-header {
+  background-color: #ffffff;
+  border-bottom: 2px solid #1f2937;
+  font-weight: 600;
+}
+
+.wx-gantt-wrapper .wx-grid-header-cell {
+  border-right: 1px solid #e5e7eb;
+  padding: 12px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+/* Row styling */
+.wx-gantt-wrapper .wx-grid-row {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.wx-gantt-wrapper .wx-grid-row:hover {
+  background-color: #f9fafb;
+}
+
+.wx-gantt-wrapper .wx-grid-cell {
+  border-right: 1px solid #e5e7eb;
+  padding: 8px 12px;
+  color: #374151;
+}
+
+/* Chart area styling */
+.wx-gantt-wrapper .wx-chart {
+  background-color: #ffffff;
+  border: 2px solid #1f2937;
+  border-left: none;
+}
+
+/* Scale (timeline header) styling */
+.wx-gantt-wrapper .wx-scale-header {
+  background-color: #f3f4f6;
+  border-bottom: 2px solid #1f2937;
+  font-weight: 600;
+}
+
+.wx-gantt-wrapper .wx-scale-cell {
+  border-right: 1px solid #d1d5db;
+  color: #1f2937;
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Task bar styling */
+.wx-gantt-wrapper .wx-task-bar {
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.wx-gantt-wrapper .wx-task-bar:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Task bar colors based on status */
+.wx-gantt-wrapper .wx-task-bar[data-status="completed"] {
+  background-color: #10b981;
+}
+
+.wx-gantt-wrapper .wx-task-bar[data-status="in-progress"] {
+  background-color: #60a5fa;
+}
+
+.wx-gantt-wrapper .wx-task-bar[data-status="not-started"] {
+  background-color: #9ca3af;
+}
+
+.wx-gantt-wrapper .wx-task-bar[data-status="overdue"] {
+  background-color: #ef4444;
+}
+
+/* Summary task (Epic/User Story) styling */
+.wx-gantt-wrapper .wx-summary-bar {
+  background-color: #9333ea;
+  border-radius: 8px;
+  height: 24px;
+}
+
+/* Milestone styling */
+.wx-gantt-wrapper .wx-milestone {
+  width: 16px;
+  height: 16px;
+  background-color: #f59e0b;
+  transform: rotate(45deg);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Link (dependency) styling */
+.wx-gantt-wrapper .wx-link {
+  stroke: #6b7280;
+  stroke-width: 2;
+  fill: none;
+}
+
+.wx-gantt-wrapper .wx-link-arrow {
+  fill: #6b7280;
+}
+
+.wx-gantt-wrapper .wx-link.critical {
+  stroke: #ef4444;
+  stroke-width: 2.5;
+}
+
+.wx-gantt-wrapper .wx-link-arrow.critical {
+  fill: #ef4444;
+}
+
+/* Today marker */
+.wx-gantt-wrapper .wx-today-marker {
+  stroke: #ef4444;
+  stroke-width: 2;
+  opacity: 0.8;
+}
+
+/* Grid lines */
+.wx-gantt-wrapper .wx-chart-grid-line {
+  stroke: #e5e7eb;
+  stroke-width: 1;
+}
+
+/* Weekend highlighting */
+.wx-gantt-wrapper .wx-weekend {
+  background-color: #fef2f2;
+}
+
+/* Progress bar within task */
+.wx-gantt-wrapper .wx-task-progress {
+  background-color: rgba(0, 0, 0, 0.15);
+  border-radius: 8px 0 0 8px;
+}
+
+/* Tooltip styling */
+.wx-gantt-wrapper .wx-tooltip {
+  background-color: #1f2937;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Scrollbar styling */
+.wx-gantt-wrapper ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.wx-gantt-wrapper ::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 6px;
+}
+
+.wx-gantt-wrapper ::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border-radius: 6px;
+}
+
+.wx-gantt-wrapper ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Selection styling */
+.wx-gantt-wrapper .wx-task-bar.selected {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Drag and drop indicators */
+.wx-gantt-wrapper .wx-drag-indicator {
+  background-color: #3b82f6;
+  opacity: 0.3;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .wx-gantt-wrapper .wx-grid-header-cell,
+  .wx-gantt-wrapper .wx-grid-cell {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  .wx-gantt-wrapper {
+    --wx-gantt-row-height: 32px;
+  }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+  .wx-gantt-wrapper {
+    --wx-gantt-primary-color: #e5e7eb;
+    --wx-gantt-secondary-color: #374151;
+    --wx-gantt-border-color: #4b5563;
+    --wx-gantt-text-color: #f3f4f6;
+    --wx-gantt-header-bg: #1f2937;
+  }
+
+  .wx-gantt-wrapper .wx-grid,
+  .wx-gantt-wrapper .wx-chart {
+    background-color: #111827;
+  }
+
+  .wx-gantt-wrapper .wx-grid-header {
+    background-color: #1f2937;
+  }
+
+  .wx-gantt-wrapper .wx-scale-header {
+    background-color: #1f2937;
+  }
+}

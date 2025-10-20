@@ -16,6 +16,8 @@ interface ViewControlsProps {
   onNavigateLeft?: () => void;
   onNavigateRight?: () => void;
   onNavigateToToday?: () => void;
+  useWxGantt?: boolean;
+  onToggleWxGantt?: (use: boolean) => void;
 }
 
 const ViewControls: React.FC<ViewControlsProps> = ({
@@ -31,7 +33,9 @@ const ViewControls: React.FC<ViewControlsProps> = ({
   onToggleCriticalPath,
   onNavigateLeft,
   onNavigateRight,
-  onNavigateToToday
+  onNavigateToToday,
+  useWxGantt = true,
+  onToggleWxGantt
 }) => {
   const viewTypes: ViewType[] = ['task', 'user-story', 'epic'];
   const zoomLevels: ZoomLevel[] = ['day', 'week', 'month'];
@@ -83,6 +87,21 @@ const ViewControls: React.FC<ViewControlsProps> = ({
 
         {/* Bottom Controls */}
         <div className="flex items-center gap-4">
+          {/* Chart Library Toggle */}
+          {onToggleWxGantt && (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useWxGantt}
+                  onChange={(e) => onToggleWxGantt(e.target.checked)}
+                  className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer"
+                />
+                <span className="text-gray-700 font-medium">wx-react-gantt</span>
+              </label>
+            </div>
+          )}
+
           {/* Critical Path Toggle */}
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-2 cursor-pointer">
