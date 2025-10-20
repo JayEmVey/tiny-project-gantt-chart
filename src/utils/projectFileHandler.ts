@@ -136,3 +136,80 @@ export const validateProjectData = (data: any): data is ProjectData => {
     Array.isArray(data.milestones)
   );
 };
+
+/**
+ * Saves the current project data to localStorage (On Cloud)
+ */
+export const saveProjectToLocalStorage = (
+  projectName: string,
+  epics: Epic[],
+  userStories: UserStory[],
+  tasks: Task[],
+  milestones: Milestone[]
+): void => {
+  const projectData: ProjectData = {
+    version: '1.0.0',
+    projectName: projectName || 'Untitled Project',
+    createdAt: new Date().toISOString(),
+    lastModified: new Date().toISOString(),
+    epics,
+    userStories,
+    tasks,
+    milestones
+  };
+
+  // Save to localStorage
+  const jsonString = JSON.stringify(projectData);
+  localStorage.setItem('tgc-cloud-project', jsonString);
+
+  // Save last modified timestamp separately for easy access
+  localStorage.setItem('tgc-cloud-project-last-saved', new Date().toISOString());
+};
+
+/**
+ * Loads project data from localStorage (On Cloud)
+ * Returns null if no project is saved in localStorage
+ */
+export const loadProjectFromLocalStorage = (): ProjectData | null => {
+  try {
+    const jsonString = localStorage.getItem('tgc-cloud-project');
+
+    if (!jsonString) {
+      return null;
+    }
+
+    const projectData: ProjectData = JSON.parse(jsonString);
+
+    // Validate the data structure
+    if (!validateProjectData(projectData)) {
+      console.error('Invalid project data in localStorage');
+      return null;
+    }
+
+    // Ensure milestones exists (for backward compatibility)
+    if (!projectData.milestones) {
+      projectData.milestones = [];
+    }
+
+    return projectData;
+  } catch (error) {
+    console.error('Failed to load project from localStorage:', error);
+    return null;
+  }
+};
+
+/**
+ * Gets the last saved timestamp from localStorage
+ * Returns null if no project has been saved
+ */
+export const getLastSavedTimestamp = (): string | null => {
+  return localStorage.getItem('tgc-cloud-project-last-saved');
+};
+
+/**
+ * Clears the project data from localStorage
+ */
+export const clearLocalStorageProject = (): void => {
+  localStorage.removeItem('tgc-cloud-project');
+  localStorage.removeItem('tgc-cloud-project-last-saved');
+};

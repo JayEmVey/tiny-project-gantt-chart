@@ -9,7 +9,7 @@ import MilestoneModal from './MilestoneModal';
 import ExportModal, { ExportOptions } from './ExportModal';
 import ViewControls from './ViewControls';
 import GanttChartView from './GanttChartView';
-import { saveProjectToFile, openProjectFile } from '../../utils/projectFileHandler';
+import { saveProjectToFile, openProjectFile, saveProjectToLocalStorage, loadProjectFromLocalStorage, getLastSavedTimestamp } from '../../utils/projectFileHandler';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './animations.css';
@@ -119,6 +119,39 @@ const GanttChartMain: React.FC = () => {
   const ganttScrollRef = useRef<HTMLDivElement>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSavedState, setLastSavedState] = useState<string>('');
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
+    const saved = localStorage.getItem('app-autosave-enabled');
+    return saved === 'true';
+  });
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load project from localStorage on mount if available
+  useEffect(() => {
+    const savedProject = loadProjectFromLocalStorage();
+    if (savedProject) {
+      setProjectName(savedProject.projectName);
+      setEpics(savedProject.epics);
+      setUserStories(savedProject.userStories);
+      setTasks(savedProject.tasks);
+      setMilestones(savedProject.milestones || []);
+
+      // Update saved state
+      const currentState = JSON.stringify({
+        projectName: savedProject.projectName,
+        epics: savedProject.epics,
+        userStories: savedProject.userStories,
+        tasks: savedProject.tasks,
+        milestones: savedProject.milestones || []
+      });
+      setLastSavedState(currentState);
+      setHasUnsavedChanges(false);
+    }
+
+    // Load last saved timestamp
+    const timestamp = getLastSavedTimestamp();
+    setLastSavedTime(timestamp);
+  }, []);
 
   // Navigate to current day on mount
   useEffect(() => {
@@ -146,7 +179,7 @@ const GanttChartMain: React.FC = () => {
     return () => clearTimeout(timer);
   }, []); // Empty dependency array means this runs once on mount
 
-  // Track changes to project data
+  // Track changes to project data and trigger auto-save
   useEffect(() => {
     const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
     if (lastSavedState === '') {
@@ -154,8 +187,28 @@ const GanttChartMain: React.FC = () => {
       setLastSavedState(currentState);
     } else if (currentState !== lastSavedState) {
       setHasUnsavedChanges(true);
+
+      // Trigger auto-save after idle period (3 seconds)
+      if (autoSaveEnabled) {
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+
+        // Set new timer for auto-save after 3 seconds of inactivity
+        autoSaveTimerRef.current = setTimeout(() => {
+          handleSaveToCloud();
+        }, 3000);
+      }
     }
-  }, [projectName, epics, userStories, tasks, milestones, lastSavedState]);
+
+    // Cleanup timer on unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [projectName, epics, userStories, tasks, milestones, lastSavedState, autoSaveEnabled]);
 
   // Add keyboard shortcuts for save (Ctrl+S / Cmd+S) and zoom (Ctrl/Cmd + Plus/Minus/0)
   useEffect(() => {
@@ -183,13 +236,34 @@ const GanttChartMain: React.FC = () => {
 
   // const filteredTasks = getFilteredTasks(); // computed on-demand where needed
 
+  // Handle AutoSave toggle
+  const handleAutoSaveToggle = (enabled: boolean) => {
+    setAutoSaveEnabled(enabled);
+    localStorage.setItem('app-autosave-enabled', enabled.toString());
+  };
+
   // Handle New Project
   const handleNewProject = () => {
+    // Check if there are unsaved changes
+    if (hasUnsavedChanges) {
+      const confirmSave = window.confirm(
+        'You have unsaved changes. Do you want to save to cloud before creating a new project?'
+      );
+
+      if (confirmSave) {
+        handleSaveToCloud();
+      }
+    }
+
     const confirmNew = window.confirm(
-      'Are you sure you want to create a new project? Any unsaved changes will be lost.'
+      'Are you sure you want to create a new project? The current cloud project will be cleared.'
     );
 
     if (confirmNew) {
+      // Clear localStorage cloud project
+      localStorage.removeItem('tgc-cloud-project');
+      localStorage.removeItem('tgc-cloud-project-last-saved');
+
       // Reset to completely empty state
       setProjectName('New Project');
       setEpics([]);
@@ -199,6 +273,9 @@ const GanttChartMain: React.FC = () => {
       setZoomLevel('day');
       setShowCriticalPath(false);
       setIsTaskListCollapsed(false);
+      setLastSavedState('');
+      setHasUnsavedChanges(false);
+      setLastSavedTime(null);
 
       alert('New project created successfully!');
     }
@@ -206,22 +283,99 @@ const GanttChartMain: React.FC = () => {
 
   // Handle Save Project
   const handleSaveProject = () => {
+    // Check if the project name is still "Untitled Project"
+    if (projectName === 'Untitled Project') {
+      const newProjectName = window.prompt(
+        'Please enter a name for your project before saving:',
+        projectName
+      );
+
+      // If user cancels or provides empty name, don't save
+      if (!newProjectName || newProjectName.trim() === '') {
+        alert('Project save cancelled. Please provide a valid project name.');
+        return;
+      }
+
+      // Update the project name before saving
+      setProjectName(newProjectName.trim());
+
+      // Save with the new name
+      try {
+        saveProjectToFile(newProjectName.trim(), epics, userStories, tasks, milestones);
+        const currentState = JSON.stringify({ projectName: newProjectName.trim(), epics, userStories, tasks, milestones });
+        setLastSavedState(currentState);
+        setHasUnsavedChanges(false);
+        alert('Project saved successfully!');
+      } catch (error) {
+        console.error('Failed to save project:', error);
+        alert('Failed to save project. Please try again.');
+      }
+    } else {
+      // Project already has a name, proceed with save
+      try {
+        saveProjectToFile(projectName, epics, userStories, tasks, milestones);
+        const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
+        setLastSavedState(currentState);
+        setHasUnsavedChanges(false);
+        alert('Project saved successfully!');
+      } catch (error) {
+        console.error('Failed to save project:', error);
+        alert('Failed to save project. Please try again.');
+      }
+    }
+  };
+
+  // Handle Save to Cloud (localStorage)
+  const handleSaveToCloud = (showAlert: boolean = false) => {
     try {
-      saveProjectToFile(projectName, epics, userStories, tasks, milestones);
+      saveProjectToLocalStorage(projectName, epics, userStories, tasks, milestones);
       const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
       setLastSavedState(currentState);
       setHasUnsavedChanges(false);
-      alert('Project saved successfully!');
+
+      // Update last saved timestamp
+      const timestamp = getLastSavedTimestamp();
+      setLastSavedTime(timestamp);
+
+      // Only show alert if explicitly requested (manual save)
+      if (showAlert) {
+        alert('Project saved to cloud successfully!');
+      }
     } catch (error) {
-      console.error('Failed to save project:', error);
-      alert('Failed to save project. Please try again.');
+      console.error('Failed to save project to cloud:', error);
+      if (showAlert) {
+        alert('Failed to save project to cloud. Please try again.');
+      }
     }
   };
 
   // Handle Open Project
   const handleOpenProject = async () => {
+    // Check if there are unsaved changes
+    if (hasUnsavedChanges) {
+      const confirmSave = window.confirm(
+        'You have unsaved changes. Do you want to save to cloud before opening a project?'
+      );
+
+      if (confirmSave) {
+        handleSaveToCloud();
+      }
+    }
+
+    const confirmOpen = window.confirm(
+      'Opening a project will clear the current cloud project. Continue?'
+    );
+
+    if (!confirmOpen) {
+      return;
+    }
+
     try {
       const projectData = await openProjectFile();
+
+      // Clear localStorage cloud project
+      localStorage.removeItem('tgc-cloud-project');
+      localStorage.removeItem('tgc-cloud-project-last-saved');
 
       // Update state with loaded data
       setProjectName(projectData.projectName);
@@ -240,6 +394,7 @@ const GanttChartMain: React.FC = () => {
       });
       setLastSavedState(currentState);
       setHasUnsavedChanges(false);
+      setLastSavedTime(null);
 
       alert('Project loaded successfully!');
     } catch (error) {
@@ -798,11 +953,15 @@ const GanttChartMain: React.FC = () => {
       <Header
         onExport={handleExportClick}
         onSaveProject={handleSaveProject}
+        onSaveToCloud={() => handleSaveToCloud(true)}
         onOpenProject={handleOpenProject}
         onNewProject={handleNewProject}
         projectName={projectName}
         onProjectNameChange={setProjectName}
         hasUnsavedChanges={hasUnsavedChanges}
+        lastSavedTime={lastSavedTime}
+        autoSaveEnabled={autoSaveEnabled}
+        onAutoSaveToggle={handleAutoSaveToggle}
         fontSizeOption={fontSizeOption}
         onFontSizeChange={setFontSizeOption}
         viewType={viewType}
