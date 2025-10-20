@@ -256,8 +256,104 @@ const GanttChartMain: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // Handle scrolling to a task's position in the timeline
+  const handleScrollToTask = (task: Task) => {
+    if (!ganttScrollRef.current || !task.startDate) return;
+
+    // Parse the task's start date (format: DD/MM/YYYY)
+    const [day, month, year] = task.startDate.split('/').map(Number);
+    const taskStartDate = new Date(year, month - 1, day);
+    const yearStart = new Date(taskStartDate.getFullYear(), 0, 1);
+
+    let taskIndex = 0;
+
+    // Calculate the index based on zoom level
+    if (zoomLevel === 'day') {
+      taskIndex = Math.floor((taskStartDate.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+    } else if (zoomLevel === 'week') {
+      taskIndex = Math.floor((taskStartDate.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    } else if (zoomLevel === 'month') {
+      taskIndex = taskStartDate.getMonth();
+    } else if (zoomLevel === 'quarter') {
+      taskIndex = Math.floor(taskStartDate.getMonth() / 3);
+    }
+
+    // Calculate total columns based on zoom level
+    const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4;
+
+    // Calculate scroll position to show the task (center it in view)
+    const scrollAmount = (taskIndex / totalColumns) * ganttScrollRef.current.scrollWidth;
+    ganttScrollRef.current.scrollTo({
+      left: scrollAmount - ganttScrollRef.current.clientWidth / 2,
+      behavior: 'smooth'
+    });
+  };
+
+  // Handle scrolling to a user story's position (finds earliest task)
+  const handleScrollToUserStory = (userStory: UserStory) => {
+    if (!ganttScrollRef.current) return;
+
+    // Find all tasks belonging to this user story
+    const userStoryTasks = tasks.filter(t => t.userStoryId === userStory.id);
+
+    if (userStoryTasks.length === 0) return;
+
+    // Find the earliest task
+    const earliestTask = userStoryTasks.reduce((earliest, current) => {
+      if (!current.startDate) return earliest;
+      if (!earliest || !earliest.startDate) return current;
+
+      const [dayC, monthC, yearC] = current.startDate.split('/').map(Number);
+      const [dayE, monthE, yearE] = earliest.startDate.split('/').map(Number);
+      const currentDate = new Date(yearC, monthC - 1, dayC);
+      const earliestDate = new Date(yearE, monthE - 1, dayE);
+
+      return currentDate < earliestDate ? current : earliest;
+    });
+
+    // Scroll to the earliest task
+    if (earliestTask) {
+      handleScrollToTask(earliestTask);
+    }
+  };
+
+  // Handle scrolling to an epic's position (finds earliest task)
+  const handleScrollToEpic = (epic: Epic) => {
+    if (!ganttScrollRef.current) return;
+
+    // Find all tasks belonging to this epic
+    const epicTasks = tasks.filter(t => t.epicId === epic.id);
+
+    if (epicTasks.length === 0) return;
+
+    // Find the earliest task
+    const earliestTask = epicTasks.reduce((earliest, current) => {
+      if (!current.startDate) return earliest;
+      if (!earliest || !earliest.startDate) return current;
+
+      const [dayC, monthC, yearC] = current.startDate.split('/').map(Number);
+      const [dayE, monthE, yearE] = earliest.startDate.split('/').map(Number);
+      const currentDate = new Date(yearC, monthC - 1, dayC);
+      const earliestDate = new Date(yearE, monthE - 1, dayE);
+
+      return currentDate < earliestDate ? current : earliest;
+    });
+
+    // Scroll to the earliest task
+    if (earliestTask) {
+      handleScrollToTask(earliestTask);
+    }
+  };
+
   // Handle clicking on a task (either from list or chart)
   const handleTaskClick = (task: Task) => {
+    // Close all other modals first
+    setIsEpicModalOpen(false);
+    setIsUserStoryModalOpen(false);
+    setIsMilestoneModalOpen(false);
+    setIsExportModalOpen(false);
+
+    // Open task modal
     setEditingTask(task);
     setIsModalOpen(true);
   };
@@ -740,8 +836,11 @@ const GanttChartMain: React.FC = () => {
             userStories={userStories}
             onAddTask={handleAddTask}
             onTaskClick={handleTaskClick}
+            onTaskScrollTo={handleScrollToTask}
             onEpicToggle={handleEpicToggle}
+            onEpicScrollTo={handleScrollToEpic}
             onUserStoryToggle={handleUserStoryToggle}
+            onUserStoryScrollTo={handleScrollToUserStory}
             onAddEpic={handleAddEpic}
             onAddUserStory={handleAddUserStory}
             onEpicClick={handleEditEpic}

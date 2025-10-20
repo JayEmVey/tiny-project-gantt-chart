@@ -8,8 +8,11 @@ interface TaskListProps {
   userStories: UserStory[];
   onAddTask: () => void;
   onTaskClick: (task: Task) => void;
+  onTaskScrollTo?: (task: Task) => void;
   onEpicToggle: (epicId: number) => void;
+  onEpicScrollTo?: (epic: Epic) => void;
   onUserStoryToggle: (userStoryId: number) => void;
+  onUserStoryScrollTo?: (userStory: UserStory) => void;
   onAddEpic: () => void;
   onAddUserStory: (epicId: number) => void;
   onEpicClick?: (epic: Epic) => void;
@@ -29,8 +32,11 @@ const TaskList: React.FC<TaskListProps> = ({
   userStories,
   onAddTask,
   onTaskClick,
+  onTaskScrollTo,
   onEpicToggle,
+  onEpicScrollTo,
   onUserStoryToggle,
+  onUserStoryScrollTo,
   onAddEpic,
   onAddUserStory,
   onEpicClick,
@@ -441,7 +447,15 @@ const TaskList: React.FC<TaskListProps> = ({
                     <ChevronRight className="w-4 h-4" />
                   )}
                 </button>
-                <div className="ml-2 flex items-center gap-2">
+                <div
+                  className="ml-2 flex items-center gap-2 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onEpicScrollTo) {
+                      onEpicScrollTo(epic);
+                    }
+                  }}
+                >
                   <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#9A4D99' }} />
                   <span className="font-bold text-gray-800">{epic.name}</span>
                 </div>
@@ -497,7 +511,15 @@ const TaskList: React.FC<TaskListProps> = ({
                             <ChevronRight className="w-3 h-3" />
                           )}
                         </button>
-                        <div className="ml-2 flex items-center gap-2">
+                        <div
+                          className="ml-2 flex items-center gap-2 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onUserStoryScrollTo) {
+                              onUserStoryScrollTo(userStory);
+                            }
+                          }}
+                        >
                           <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#00694C' }} />
                           <span className="font-medium text-gray-700">{userStory.name}</span>
                         </div>
@@ -515,8 +537,17 @@ const TaskList: React.FC<TaskListProps> = ({
                               onDragLeave={handleTaskDragLeave}
                               onDrop={(e) => handleTaskDrop(e, task.id)}
                               onDragEnd={handleTaskDragEnd}
-                              onClick={() => onTaskClick(task)}
-                              className={`flex items-center px-4 py-2 hover:bg-gray-50 cursor-move transition-colors ${
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onTaskScrollTo) {
+                                  onTaskScrollTo(task);
+                                }
+                              }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                onTaskClick(task);
+                              }}
+                              className={`flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors ${
                                 draggedTaskId === task.id ? 'opacity-50' : ''
                               } ${
                                 dragOverTaskId === task.id && draggedTaskId !== task.id ? 'border-t-2 border-blue-500' : ''
