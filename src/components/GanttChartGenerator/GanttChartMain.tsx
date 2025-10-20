@@ -1054,6 +1054,7 @@ const GanttChartMain: React.FC = () => {
       <TaskModal
         isOpen={isModalOpen}
         task={editingTask}
+        tasks={tasks}
         epics={epics}
         userStories={userStories}
         onClose={() => setIsModalOpen(false)}

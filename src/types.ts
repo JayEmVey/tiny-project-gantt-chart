@@ -3,6 +3,11 @@ export interface TaskDependency {
   type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish'
 }
 
+export interface LinkedIssue {
+  taskId: number
+  linkType: 'blocks' | 'is-blocked-by' | 'duplicates' | 'is-duplicated-by' | 'clones' | 'is-cloned-by' | 'relates-to'
+}
+
 export interface Epic {
   id: number
   name: string
@@ -31,15 +36,12 @@ export interface Task {
   process: string
   startDate: string // DD/MM/YYYY format
   endDate: string   // DD/MM/YYYY format
-  assignee?: string
-  status?: 'not-started' | 'in-progress' | 'completed' | 'overdue'
-  priority?: 'low' | 'medium' | 'high'
-  progress?: number // 0-100
   description?: string
-  dependencies?: number[] // IDs of tasks this depends on (for backward compatibility)
-  dependenciesV2?: TaskDependency[] // New format with dependency types
-  epicId?: number
-  userStoryId?: number
+  assignee?: string
+  priority?: 'Low' | 'Medium' | 'High' | 'Critical'
+  status?: 'Not Started' | 'In Progress' | 'Completed' | 'On Hold'
+  progress?: number // 0-100 percentage
+  dependencies?: number[] // Array of task IDs this task depends on
 }
 
 // Alias for backward compatibility

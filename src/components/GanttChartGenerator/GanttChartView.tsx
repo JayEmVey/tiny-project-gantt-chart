@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, forwardRef } from 'react';
 import { Task, ZoomLevel, Epic, Milestone, ViewType, UserStory } from '../../types';
 import { calculateEpicDates } from '../../utils/epicDateCalculator';
+import { getCriticalDependencies } from '../../utils/criticalPathCalculator';
 
 interface GanttChartViewProps {
   tasks: Task[];
@@ -651,6 +652,116 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
     return () => clearTimeout(timer);
   }, [zoomLevel, viewType, scrollRef]);
 
+  // Render dependency arrows
+  const renderDependencyArrows = () => {
+    if (!showCriticalPath || viewType !== 'task') return null;
+
+    const dependencies = getCriticalDependencies(tasks, showCriticalPath);
+    if (dependencies.length === 0) return null;
+
+    // Get visible tasks based on current view
+    const visibleTasks = viewType === 'task'
+      ? tasks.filter(task => {
+          const epic = epics.find(e => e.id === task.epicId);
+          const userStory = userStories.find(us => us.id === task.userStoryId);
+          return epic?.isSelected && userStory?.isSelected;
+        })
+      : tasks;
+
+    // Create a map of task IDs to their row index in the visible list
+    const taskIndexMap = new Map<number, number>();
+    visibleTasks.forEach((task, index) => {
+      taskIndexMap.set(task.id, index);
+    });
+
+    return (
+      <>
+        {dependencies.map((dep, depIndex) => {
+          const fromIndex = taskIndexMap.get(dep.fromTaskId);
+          const toIndex = taskIndexMap.get(dep.toTaskId);
+
+          if (fromIndex === undefined || toIndex === undefined) return null;
+
+          const fromTask = visibleTasks.find(t => t.id === dep.fromTaskId);
+          const toTask = visibleTasks.find(t => t.id === dep.toTaskId);
+          if (!fromTask || !toTask) return null;
+
+          const fromBarPos = calculateBarPosition(fromTask.startDate, fromTask.endDate);
+          const toBarPos = calculateBarPosition(toTask.startDate, toTask.endDate);
+
+          if (!fromBarPos || !toBarPos) return null;
+
+          // Parse percentage values
+          const fromLeft = parseFloat(fromBarPos.left);
+          const fromWidth = parseFloat(fromBarPos.width);
+          const toLeft = parseFloat(toBarPos.left);
+
+          // Calculate row positions
+          const rowHeight = 64;
+          const headerRows = zoomLevel === 'day' ? 3 : 2; // day view has extra header row
+          const headerHeight = headerRows * 40; // approximate header row height
+
+          const startY = headerHeight + (fromIndex * rowHeight) + (rowHeight / 2);
+          const endY = headerHeight + (toIndex * rowHeight) + (rowHeight / 2);
+
+          // X positions (0-100 coordinate system)
+          const startX = fromLeft + fromWidth;
+          const endX = toLeft;
+          const midX = startX + (endX - startX) / 2;
+
+          const strokeColor = dep.isCritical ? '#ef4444' : '#94a3b8';
+
+          // Calculate total height for viewBox
+          const totalHeight = Math.max(startY, endY) + 100;
+
+          return (
+            <div
+              key={`dep-${depIndex}-${dep.fromTaskId}-${dep.toTaskId}`}
+              className="absolute pointer-events-none"
+              style={{
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                zIndex: 15
+              }}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                viewBox={`0 0 100 ${totalHeight}`}
+                preserveAspectRatio="none"
+                style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}
+              >
+                <defs>
+                  <marker
+                    id={`arrowhead-${dep.isCritical ? 'critical' : 'normal'}-${depIndex}`}
+                    markerWidth="10"
+                    markerHeight="10"
+                    refX="8"
+                    refY="5"
+                    orient="auto"
+                  >
+                    <path d="M0,0 L0,10 L10,5 z" fill={strokeColor} />
+                  </marker>
+                </defs>
+                <path
+                  d={`M ${startX},${startY} L ${midX},${startY} L ${midX},${endY} L ${endX},${endY}`}
+                  stroke={strokeColor}
+                  strokeWidth={dep.isCritical ? 0.3 : 0.2}
+                  fill="none"
+                  markerEnd={`url(#arrowhead-${dep.isCritical ? 'critical' : 'normal'}-${depIndex})`}
+                  opacity={dep.isCritical ? 1 : 0.7}
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
   return (
     <div ref={scrollRef} className="flex-1 overflow-auto bg-gray-50" style={{
       zoom: zoomScale
@@ -1166,10 +1277,6 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                                 style={{ width: `${task.progress}%` }}
                               />
                             )}
-                            {/* Critical path indicator */}
-                            {showCriticalPath && task.dependencies && task.dependencies.length > 0 && (
-                              <div className="absolute inset-0 border-2 border-red-500 rounded-lg" />
-                            )}
                           </div>
                         )}
                         {/* Today marker for this row */}
@@ -1241,6 +1348,8 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
             )}
           </tbody>
         </table>
+        {/* Render dependency arrows as overlay */}
+        {renderDependencyArrows()}
       </div>
     </div>
   );

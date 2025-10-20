@@ -273,6 +273,10 @@ export interface Task {
 - **Click Empty Cell:** Click an empty area to create a new task at that date
 - **Zoom:** Use Day/Week/Month/Quarter buttons to change timeline scale
 - **Navigate:** Use arrow buttons or "Today" button to navigate the timeline
+- **Critical Path:** Enable the "Critical Path" toggle to visualize task dependencies
+  - Red arrows show critical dependencies (tasks that directly impact project completion)
+  - Gray arrows show non-critical dependencies
+  - Critical path helps identify tasks that cannot be delayed without affecting the project timeline
 
 ### Project Management
 - **Save Project:** Press Ctrl+S (Cmd+S on Mac) or use File → Save Project
