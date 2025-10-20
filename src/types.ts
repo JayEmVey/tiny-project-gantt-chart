@@ -38,10 +38,43 @@ export interface Task {
   endDate: string   // DD/MM/YYYY format
   description?: string
   assignee?: string
-  priority?: 'Low' | 'Medium' | 'High' | 'Critical'
-  status?: 'Not Started' | 'In Progress' | 'Completed' | 'On Hold'
+  /**
+   * Priority accepts both title-case and lowercase variants for backward compatibility,
+   * and will gracefully accept other string values coming from imports.
+   */
+  priority?:
+    | 'Low'
+    | 'Medium'
+    | 'High'
+    | 'Critical'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'critical'
+    | (string & {})
+  /**
+   * Status accepts both spaced and kebab-case variants, plus 'overdue',
+   * and will gracefully accept other string values coming from imports.
+   */
+  status?:
+    | 'Not Started'
+    | 'In Progress'
+    | 'Completed'
+    | 'On Hold'
+    | 'not-started'
+    | 'in-progress'
+    | 'completed'
+    | 'overdue'
+    | (string & {})
   progress?: number // 0-100 percentage
   dependencies?: number[] // Array of task IDs this task depends on
+  /** Optional relations for grouping in lists and views */
+  epicId?: number
+  userStoryId?: number
+  /** Rich dependency model (optional, used by some UIs) */
+  dependenciesV2?: TaskDependency[]
+  /** Optional linked issue metadata used in TaskModal */
+  linkedIssues?: LinkedIssue[]
 }
 
 // Alias for backward compatibility
