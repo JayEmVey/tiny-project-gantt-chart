@@ -296,6 +296,30 @@ export function transformDependenciesToLinks(tasks: Task[]): WxGanttLink[] {
 }
 
 /**
+ * Get week display info: week number and date range
+ */
+function getWeekDisplayInfo(date: Date): string {
+  // Get ISO week number
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNum = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+
+  // Get week start (Monday)
+  const weekStart = new Date(date);
+  const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const diff = date.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust to Monday
+  weekStart.setDate(diff);
+
+  // Get week end (Sunday)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  return `W${weekNum}:\n${weekStart.getDate()}-${weekEnd.getDate()}`;
+}
+
+/**
  * Get scale configuration based on zoom level
  */
 export function getScalesForZoomLevel(zoomLevel: ZoomLevel): WxGanttScale[] {
@@ -307,8 +331,8 @@ export function getScalesForZoomLevel(zoomLevel: ZoomLevel): WxGanttScale[] {
       ];
     case 'week':
       return [
-        { unit: 'quarter', step: 1, format: '[Q]Q yyyy' },
-        { unit: 'week', step: 1, format: '[W]w' },
+        { unit: 'month', step: 1, format: 'MMMM yyyy' },
+        { unit: 'week', step: 1, format: getWeekDisplayInfo as any },
       ];
     case 'month':
       return [
@@ -338,7 +362,8 @@ export function transformDataForWxGantt(
   userStories: UserStory[],
   milestones: Milestone[],
   zoomLevel: ZoomLevel,
-  viewType: 'task' | 'user-story' | 'epic'
+  viewType: 'task' | 'user-story' | 'epic',
+  showCriticalPath: boolean = false
 ): {
   tasks: WxGanttTask[];
   links: WxGanttLink[];
@@ -392,8 +417,8 @@ export function transformDataForWxGantt(
     }
   });
 
-  // Transform dependencies to links
-  const links = transformDependenciesToLinks(tasks);
+  // Transform dependencies to links (only if critical path is enabled)
+  const links = showCriticalPath ? transformDependenciesToLinks(tasks) : [];
 
   return {
     tasks: wxTasks,

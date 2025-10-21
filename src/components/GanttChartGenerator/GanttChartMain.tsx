@@ -99,7 +99,7 @@ const GanttChartMain: React.FC = () => {
   const [zoomScale, setZoomScale] = useState<number>(1.0); // 0.25 to 3.0
   const [viewType, setViewType] = useState<ViewType>('task');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
-  const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
+  const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(true);
   const [useWxGantt, setUseWxGantt] = useState(true); // Toggle between original and wx-react-gantt view
   // Global font size option: larger | medium | smaller
   const [fontSizeOption, setFontSizeOption] = useState<'larger' | 'medium' | 'smaller'>(() => {

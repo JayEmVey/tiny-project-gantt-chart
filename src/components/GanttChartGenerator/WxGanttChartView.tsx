@@ -20,7 +20,7 @@ interface WxGanttChartViewProps {
   onTaskClick?: (task: Task) => void;
   onTaskUpdate?: (task: Task) => void;
   onEpicClick?: (epic: Epic) => void;
-  showCriticalPath?: boolean;
+  showCriticalPath: boolean;
 }
 
 /**
@@ -39,8 +39,7 @@ const WxGanttChartView: React.FC<WxGanttChartViewProps> = ({
   onTaskClick,
   onTaskUpdate,
   onEpicClick,
-  // showCriticalPath is currently not supported by wx-react-gantt
-  // We may need to implement custom styling for critical path tasks later
+  showCriticalPath,
 }) => {
   const apiRef = useRef<any>(null);
   const [ganttData, setGanttData] = useState<{
@@ -58,7 +57,8 @@ const WxGanttChartView: React.FC<WxGanttChartViewProps> = ({
         userStories,
         milestones,
         zoomLevel,
-        viewType
+        viewType,
+        showCriticalPath
       );
       console.log('Transformed Gantt Data:', transformed);
       setGanttData(transformed);
@@ -66,7 +66,7 @@ const WxGanttChartView: React.FC<WxGanttChartViewProps> = ({
       console.error('Error transforming data for wx-react-gantt:', error);
       setGanttData(null);
     }
-  }, [tasks, epics, userStories, milestones, zoomLevel, viewType]);
+  }, [tasks, epics, userStories, milestones, zoomLevel, viewType, showCriticalPath]);
 
   // Initialize API reference
   const handleInit = (api: any) => {
@@ -176,6 +176,7 @@ const WxGanttChartView: React.FC<WxGanttChartViewProps> = ({
           tasks={ganttData.tasks}
           links={ganttData.links}
           scales={ganttData.scales}
+          columns={columns}
           init={handleInit}
         />
       </Willow>

@@ -24,6 +24,44 @@ const TaskModal: React.FC<TaskModalProps> = ({
   onSave,
   onDelete
 }) => {
+  // Helper function to normalize status from title-case to kebab-case
+  const normalizeStatus = (status: string | undefined): string => {
+    if (!status) return 'not-started';
+    switch (status.toLowerCase()) {
+      case 'not started':
+      case 'not-started':
+        return 'not-started';
+      case 'in progress':
+      case 'in-progress':
+        return 'in-progress';
+      case 'completed':
+        return 'completed';
+      case 'on hold':
+        return 'not-started'; // Map to not-started as closest equivalent
+      case 'overdue':
+        return 'overdue';
+      default:
+        return 'not-started';
+    }
+  };
+
+  // Helper function to normalize priority from title-case to kebab-case
+  const normalizePriority = (priority: string | undefined): string => {
+    if (!priority) return 'medium';
+    switch (priority.toLowerCase()) {
+      case 'low':
+        return 'low';
+      case 'medium':
+        return 'medium';
+      case 'high':
+        return 'high';
+      case 'critical':
+        return 'high'; // Map critical to high as closest equivalent
+      default:
+        return 'medium';
+    }
+  };
+
   const [formData, setFormData] = useState<Partial<Task>>({
     process: '',
     startDate: '',
@@ -41,7 +79,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   useEffect(() => {
     if (task) {
-      setFormData(task);
+      // Normalize status and priority values for form compatibility
+      setFormData({
+        ...task,
+        status: normalizeStatus(task.status),
+        priority: normalizePriority(task.priority)
+      });
     } else {
       // Set default epic and user story if available
       const defaultEpicId = epics.length > 0 ? epics[0].id : undefined;
@@ -101,6 +144,25 @@ const TaskModal: React.FC<TaskModalProps> = ({
       [field]: value
     };
     setFormData({ ...formData, linkedIssues: updatedLinkedIssues });
+  };
+
+  const handleAddDependency = () => {
+    setFormData({
+      ...formData,
+      dependencies: [...(formData.dependencies || []), 0]
+    });
+  };
+
+  const handleRemoveDependency = (index: number) => {
+    const updatedDependencies = [...(formData.dependencies || [])];
+    updatedDependencies.splice(index, 1);
+    setFormData({ ...formData, dependencies: updatedDependencies });
+  };
+
+  const handleDependencyChange = (index: number, taskId: number) => {
+    const updatedDependencies = [...(formData.dependencies || [])];
+    updatedDependencies[index] = taskId;
+    setFormData({ ...formData, dependencies: updatedDependencies });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -341,6 +403,60 @@ const TaskModal: React.FC<TaskModalProps> = ({
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          {/* Dependencies */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Dependencies
+              </label>
+              <button
+                type="button"
+                onClick={handleAddDependency}
+                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Dependency
+              </button>
+            </div>
+            {formData.dependencies && formData.dependencies.length > 0 ? (
+              <div className="space-y-2">
+                {formData.dependencies.map((depId, index) => (
+                  <div key={index} className="flex gap-2 items-center p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Depends on Task
+                      </label>
+                      <select
+                        value={depId || ''}
+                        onChange={(e) => handleDependencyChange(index, parseInt(e.target.value))}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select a task</option>
+                        {tasks
+                          .filter(t => t.id !== task?.id) // Exclude current task
+                          .map(t => (
+                            <option key={t.id} value={t.id}>
+                              {t.process}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDependency(index)}
+                      className="text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
+                      title="Remove dependency"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 italic">No dependencies. Click "Add Dependency" to set task dependencies.</p>
+            )}
           </div>
 
           {/* Linked Issues */}
