@@ -10,42 +10,84 @@ const GanttChartGenerator: React.FC = () => {
       process: 'Planning',
       startDate: '01/01/2025',
       endDate: '28/02/2025',
+      description: 'Initial project planning and requirements gathering',
+      assignee: 'John Doe',
+      priority: 'High',
+      status: 'Completed',
+      progress: 100,
+      dependencies: []
     },
     {
       id: 2,
       process: 'Wireframing',
       startDate: '01/03/2025',
       endDate: '15/04/2025',
+      description: 'Create wireframes for all major screens',
+      assignee: 'Loran Doe',
+      priority: 'Medium',
+      status: 'Completed',
+      progress: 100,
+      dependencies: [1]
     },
     {
       id: 3,
       process: 'Design Process',
       startDate: '15/03/2025',
       endDate: '31/05/2025',
+      description: 'UI/UX design and prototyping',
+      assignee: 'Anthony Black',
+      priority: 'High',
+      status: 'In Progress',
+      progress: 75,
+      dependencies: [2]
     },
     {
       id: 4,
       process: 'Front-end development',
       startDate: '01/06/2025',
       endDate: '30/09/2025',
+      description: 'Implement user interface components',
+      assignee: 'Kate Small',
+      priority: 'High',
+      status: 'Not Started',
+      progress: 0,
+      dependencies: [3]
     },
     {
       id: 5,
       process: 'Back-end development',
       startDate: '01/05/2025',
       endDate: '31/08/2025',
+      description: 'Develop server-side functionality and APIs',
+      assignee: 'Jim White',
+      priority: 'Critical',
+      status: 'In Progress',
+      progress: 30,
+      dependencies: [2]
     },
     {
       id: 6,
       process: 'Deployment',
       startDate: '01/10/2025',
       endDate: '31/12/2025',
+      description: 'Production deployment and monitoring',
+      assignee: 'John Doe',
+      priority: 'Medium',
+      status: 'Not Started',
+      progress: 0,
+      dependencies: [4, 5]
     }
   ]);
 
   const [currentPage, setCurrentPage] = useState<'chart' | 'edit'>('chart');
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showModal, setShowModal] = useState(false);
+  
+  // Zoom and pagination state
+  const [zoomLevel, setZoomLevel] = useState<'day' | 'week' | 'month'>('day');
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const tasksPerPage = 10;
+  
   const [dragState, setDragState] = useState<DragState>({
     draggingTask: null,
     dragStartX: 0,
@@ -53,6 +95,20 @@ const GanttChartGenerator: React.FC = () => {
     dragPreview: null,
     originalTaskState: null
   });
+  
+  // State for task creation by drawing
+  const [creationState, setCreationState] = useState<{
+    isCreating: boolean;
+    startX: number;
+    startDate: string | null;
+    currentDate: string | null;
+  }>({
+    isCreating: false,
+    startX: 0,
+    startDate: null,
+    currentDate: null
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const tgcInputRef = useRef<HTMLInputElement>(null);
   // Save project as .tgc file
@@ -107,6 +163,16 @@ const GanttChartGenerator: React.FC = () => {
   const rangeEnd = new Date(2025, 6, 31);
   const totalRangeDays = Math.round((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
+  // Calculate cell width based on zoom level
+  const cellWidth = React.useMemo(() => {
+    switch (zoomLevel) {
+      case 'day': return 28;
+      case 'week': return 100;
+      case 'month': return 200;
+      default: return 28;
+    }
+  }, [zoomLevel]);
+
   const dayColumns = React.useMemo(() => {
     const cols: { day: number; monthIndex: number }[] = [];
     months.forEach((m, mi) => {
@@ -129,6 +195,26 @@ const GanttChartGenerator: React.FC = () => {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
+  };
+
+  // Helper function to convert mouse X position to date
+  const getDateFromMouseX = (mouseX: number, containerElement: HTMLElement): string | null => {
+    const tableOffset = 260; // width of first column
+    
+    // Get the position relative to the container
+    const rect = containerElement.getBoundingClientRect();
+    const relativeX = mouseX - rect.left - tableOffset;
+    
+    if (relativeX < 0) return null;
+    
+    // Calculate which day this corresponds to
+    const dayIndex = Math.floor(relativeX / cellWidth);
+    
+    if (dayIndex < 0 || dayIndex >= totalRangeDays) return null;
+    
+    // Calculate the actual date
+    const targetDate = new Date(rangeStart.getTime() + (dayIndex * 24 * 60 * 60 * 1000));
+    return formatDate(targetDate);
   };
 
   // Helper function to convert DD/MM/YYYY to YYYY-MM-DD for input fields
@@ -184,12 +270,11 @@ const GanttChartGenerator: React.FC = () => {
 
     // Calculate position based on the first cell's position - 
     // the bar will be positioned absolutely relative to the table
-    const tdWidth = 28; // minWidth of day cells
     const labelWidth = 260; // width of first column
     
     return {
-      left: `calc(${labelWidth}px + ${leftDays * tdWidth}px)`,
-      width: `${duration * tdWidth}px`
+      left: `calc(${labelWidth}px + ${leftDays * cellWidth}px)`,
+      width: `${duration * cellWidth}px`
     };
   };
 
@@ -243,6 +328,24 @@ const GanttChartGenerator: React.FC = () => {
 
   const saveEditedTask = () => {
     if (editingTask) {
+      // Validate dependencies - check for circular dependencies
+      if (editingTask.dependencies && editingTask.dependencies.length > 0) {
+        const hasCircular = (taskId: number, visited: Set<number> = new Set()): boolean => {
+          if (visited.has(taskId)) return true;
+          visited.add(taskId);
+          
+          const task = tasks.find(t => t.id === taskId);
+          if (!task?.dependencies) return false;
+          
+          return task.dependencies.some(depId => hasCircular(depId, new Set(visited)));
+        };
+        
+        if (hasCircular(editingTask.id)) {
+          alert('Cannot save: Circular dependency detected! A task cannot depend on itself directly or indirectly.');
+          return;
+        }
+      }
+      
       setTasks(tasks.map(task => 
         task.id === editingTask.id ? editingTask : task
       ));
@@ -328,6 +431,72 @@ const GanttChartGenerator: React.FC = () => {
       dragPreview: null,
       originalTaskState: null
     });
+
+    // Handle task creation
+    if (creationState.isCreating && creationState.startDate && creationState.currentDate) {
+      const startDate = parseDate(creationState.startDate);
+      const endDate = parseDate(creationState.currentDate);
+      
+      if (startDate && endDate) {
+        // Ensure start is before end
+        const actualStartDate = startDate <= endDate ? startDate : endDate;
+        const actualEndDate = startDate <= endDate ? endDate : startDate;
+        
+        // Create new task with generated dates
+        const newTask: Task = {
+          id: Math.max(...tasks.map(t => t.id), 0) + 1,
+          process: `New Task ${tasks.length + 1}`,
+          startDate: formatDate(actualStartDate),
+          endDate: formatDate(actualEndDate),
+          description: 'New task created by drawing',
+          assignee: 'Unassigned',
+          priority: 'Medium',
+          status: 'Not Started',
+          progress: 0
+        };
+        
+        setTasks([...tasks, newTask]);
+        setEditingTask(newTask);
+        setShowModal(true);
+      }
+    }
+
+    setCreationState({
+      isCreating: false,
+      startX: 0,
+      startDate: null,
+      currentDate: null
+    });
+  };
+
+  // Handle mouse down on empty timeline for task creation
+  const handleTimelineMouseDown = (e: React.MouseEvent, containerElement: HTMLElement) => {
+    // Only start creation if clicking on empty space (not on a task bar)
+    const target = e.target as HTMLElement;
+    if (target.closest('.gantt-task-bar')) return;
+    
+    const date = getDateFromMouseX(e.clientX, containerElement);
+    if (date) {
+      setCreationState({
+        isCreating: true,
+        startX: e.clientX,
+        startDate: date,
+        currentDate: date
+      });
+    }
+  };
+
+  // Handle mouse move during task creation
+  const handleTimelineMouseMove = (e: React.MouseEvent, containerElement: HTMLElement) => {
+    if (creationState.isCreating) {
+      const date = getDateFromMouseX(e.clientX, containerElement);
+      if (date) {
+        setCreationState(prev => ({
+          ...prev,
+          currentDate: date
+        }));
+      }
+    }
   };
 
   return (
@@ -397,6 +566,43 @@ const GanttChartGenerator: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 Add Process
               </button>
+            )}
+            
+            {/* Zoom Level Controls */}
+            {currentPage === 'chart' && (
+              <div className="flex items-center gap-2 border-l-2 border-gray-300 pl-4">
+                <span className="text-sm font-medium text-gray-700">Zoom:</span>
+                <button
+                  onClick={() => setZoomLevel('day')}
+                  className={`px-3 py-2 rounded transition font-medium ${
+                    zoomLevel === 'day' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                >
+                  Day
+                </button>
+                <button
+                  onClick={() => setZoomLevel('week')}
+                  className={`px-3 py-2 rounded transition font-medium ${
+                    zoomLevel === 'week' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                >
+                  Week
+                </button>
+                <button
+                  onClick={() => setZoomLevel('month')}
+                  className={`px-3 py-2 rounded transition font-medium ${
+                    zoomLevel === 'month' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                >
+                  Month
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -479,7 +685,12 @@ const GanttChartGenerator: React.FC = () => {
               <div className="flex-1 text-center py-3" style={{ background: '#2b78e4' }}>Q1</div>
               <div className="flex-1 text-center py-3" style={{ background: '#00b0ff' }}>Q2</div>
             </div>
-            <div className="overflow-x-auto gantt-timeline">
+            <div 
+              className="overflow-x-auto gantt-timeline"
+              onMouseDown={(e) => handleTimelineMouseDown(e, e.currentTarget)}
+              onMouseMove={(e) => handleTimelineMouseMove(e, e.currentTarget)}
+              onMouseUp={handleMouseUp}
+            >
               <table className="w-full border-collapse gantt-grid">
                 <thead>
                   <tr>
@@ -494,12 +705,14 @@ const GanttChartGenerator: React.FC = () => {
                   </tr>
                   <tr>
                     {dayColumns.map((c, idx) => (
-                      <th key={idx} className="gantt-day-cell p-1 text-xs" style={{ minWidth: '28px', background: months[c.monthIndex].band }}>{c.day}</th>
+                      <th key={idx} className="gantt-day-cell p-1 text-xs" style={{ minWidth: `${cellWidth}px`, background: months[c.monthIndex].band }}>{c.day}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {tasks.map((task, rowIdx) => {
+                  {tasks
+                    .slice(currentPageIndex * tasksPerPage, (currentPageIndex + 1) * tasksPerPage)
+                    .map((task, rowIdx) => {
                     const displayTask = dragState.draggingTask === task.id && dragState.dragPreview 
                       ? { ...task, ...dragState.dragPreview }
                       : task;
@@ -510,7 +723,7 @@ const GanttChartGenerator: React.FC = () => {
                           {task.process}
                         </td>
                         {dayColumns.map((c, dayIdx) => (
-                          <td key={dayIdx} className="gantt-day-cell p-0 relative" style={{ height: '44px', minWidth: '28px', background: months[c.monthIndex].band }}>
+                          <td key={dayIdx} className="gantt-day-cell p-0 relative" style={{ height: '44px', minWidth: `${cellWidth}px`, background: months[c.monthIndex].band }}>
                             {/* Only render the bar once in the first cell, but position it absolutely across all cells */}
                             {dayIdx === 0 && (() => {
                               const barPosition = calculateBarPosition(displayTask.startDate, displayTask.endDate);
@@ -570,6 +783,33 @@ const GanttChartGenerator: React.FC = () => {
                   })}
                 </tbody>
               </table>
+
+              {/* Task creation preview */}
+              {creationState.isCreating && creationState.startDate && creationState.currentDate && (() => {
+                const startDate = parseDate(creationState.startDate);
+                const currentDate = parseDate(creationState.currentDate);
+                if (!startDate || !currentDate) return null;
+                
+                const actualStartDate = startDate <= currentDate ? startDate : currentDate;
+                const actualEndDate = startDate <= currentDate ? currentDate : startDate;
+                
+                const previewPosition = calculateBarPosition(formatDate(actualStartDate), formatDate(actualEndDate));
+                if (!previewPosition) return null;
+                
+                return (
+                  <div
+                    className="absolute task-creation-preview"
+                    style={{
+                      left: previewPosition.left,
+                      width: previewPosition.width,
+                      height: '16px',
+                      top: '140px',
+                      zIndex: 20
+                    }}
+                  />
+                );
+              })()}
+              
             </div>
             {/* Today line */}
             {(() => {
@@ -593,6 +833,51 @@ const GanttChartGenerator: React.FC = () => {
               <div className="legend-item"><span className="legend-swatch task-yellow"></span> Kate Small</div>
               <div className="legend-item"><span className="legend-swatch task-red"></span> Jim White</div>
             </div>
+            
+            {/* Pagination Controls */}
+            {tasks.length > tasksPerPage && (
+              <div className="flex items-center justify-center gap-4 mt-6 pb-4">
+                <button
+                  onClick={() => setCurrentPageIndex(Math.max(0, currentPageIndex - 1))}
+                  disabled={currentPageIndex === 0}
+                  className={`flex items-center gap-2 px-4 py-2 rounded transition font-medium ${
+                    currentPageIndex === 0
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  <span>← Previous</span>
+                </button>
+                
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: Math.ceil(tasks.length / tasksPerPage) }, (_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentPageIndex(i)}
+                      className={`w-10 h-10 rounded-full transition font-medium ${
+                        currentPageIndex === i
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                </div>
+                
+                <button
+                  onClick={() => setCurrentPageIndex(Math.min(Math.ceil(tasks.length / tasksPerPage) - 1, currentPageIndex + 1))}
+                  disabled={currentPageIndex >= Math.ceil(tasks.length / tasksPerPage) - 1}
+                  className={`flex items-center gap-2 px-4 py-2 rounded transition font-medium ${
+                    currentPageIndex >= Math.ceil(tasks.length / tasksPerPage) - 1
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
+                >
+                  <span>Next →</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -628,6 +913,30 @@ const GanttChartGenerator: React.FC = () => {
                   onChange={(e) => setEditingTask({ ...editingTask, endDate: fromInputFormat(e.target.value) })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Dependencies</label>
+                <select
+                  multiple
+                  value={editingTask.dependencies?.map(d => d.toString()) || []}
+                  onChange={(e) => {
+                    const selectedDeps = Array.from(e.target.selectedOptions, option => parseInt(option.value));
+                    setEditingTask({ ...editingTask, dependencies: selectedDeps });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-400 h-24"
+                >
+                  {tasks
+                    .filter(t => t.id !== editingTask.id)
+                    .map(task => (
+                      <option key={task.id} value={task.id}>
+                        {task.process}
+                      </option>
+                    ))
+                  }
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Hold Ctrl/Cmd to select multiple dependencies
+                </p>
               </div>
             </div>
             <div className="flex gap-3 mt-6">

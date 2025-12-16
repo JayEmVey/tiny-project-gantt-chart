@@ -11,6 +11,9 @@
   color: #213547;
   background-color: #ffffff;
 
+  /* Global font size control (default Medium = 12px) */
+  font-size: var(--app-font-size, 12px);
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

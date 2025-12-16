@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { Task, Epic, UserStory } from '../../types';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { Task, Epic, UserStory, LinkedIssue } from '../../types';
 import { getAssigneeList } from '../../utils/assigneeListParser';
 
 interface TaskModalProps {
   isOpen: boolean;
   task: Task | null;
+  tasks: Task[];
   epics: Epic[];
   userStories: UserStory[];
   onClose: () => void;
@@ -16,6 +17,7 @@ interface TaskModalProps {
 const TaskModal: React.FC<TaskModalProps> = ({
   isOpen,
   task,
+  tasks,
   epics,
   userStories,
   onClose,
@@ -32,6 +34,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     progress: 0,
     description: '',
     dependencies: [],
+    linkedIssues: [],
     epicId: undefined,
     userStoryId: undefined
   });
@@ -53,6 +56,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         progress: 0,
         description: '',
         dependencies: [],
+        linkedIssues: [],
         epicId: defaultEpicId,
         userStoryId: defaultUserStoryId
       });
@@ -71,6 +75,32 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (!dateStr) return '';
     const [year, month, day] = dateStr.split('-');
     return `${day}/${month}/${year}`;
+  };
+
+  const handleAddLinkedIssue = () => {
+    const newLinkedIssue: LinkedIssue = {
+      taskId: 0,
+      linkType: 'relates-to'
+    };
+    setFormData({
+      ...formData,
+      linkedIssues: [...(formData.linkedIssues || []), newLinkedIssue]
+    });
+  };
+
+  const handleRemoveLinkedIssue = (index: number) => {
+    const updatedLinkedIssues = [...(formData.linkedIssues || [])];
+    updatedLinkedIssues.splice(index, 1);
+    setFormData({ ...formData, linkedIssues: updatedLinkedIssues });
+  };
+
+  const handleLinkedIssueChange = (index: number, field: keyof LinkedIssue, value: any) => {
+    const updatedLinkedIssues = [...(formData.linkedIssues || [])];
+    updatedLinkedIssues[index] = {
+      ...updatedLinkedIssues[index],
+      [field]: value
+    };
+    setFormData({ ...formData, linkedIssues: updatedLinkedIssues });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -99,6 +129,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       progress: formData.progress || 0,
       description: formData.description || '',
       dependencies: formData.dependencies || [],
+      linkedIssues: formData.linkedIssues || [],
       epicId: formData.epicId,
       userStoryId: formData.userStoryId
     };
@@ -310,6 +341,80 @@ const TaskModal: React.FC<TaskModalProps> = ({
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          {/* Linked Issues */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Linked Issues
+              </label>
+              <button
+                type="button"
+                onClick={handleAddLinkedIssue}
+                className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Add Link
+              </button>
+            </div>
+            {formData.linkedIssues && formData.linkedIssues.length > 0 ? (
+              <div className="space-y-2">
+                {formData.linkedIssues.map((link, index) => (
+                  <div key={index} className="flex gap-2 items-start p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Link Type
+                        </label>
+                        <select
+                          value={link.linkType}
+                          onChange={(e) => handleLinkedIssueChange(index, 'linkType', e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="blocks">Blocks</option>
+                          <option value="is-blocked-by">Is blocked by</option>
+                          <option value="duplicates">Duplicates</option>
+                          <option value="is-duplicated-by">Is duplicated by</option>
+                          <option value="clones">Clones</option>
+                          <option value="is-cloned-by">Is cloned by</option>
+                          <option value="relates-to">Relates to</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Task
+                        </label>
+                        <select
+                          value={link.taskId || ''}
+                          onChange={(e) => handleLinkedIssueChange(index, 'taskId', parseInt(e.target.value))}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="">Select a task</option>
+                          {tasks
+                            .filter(t => t.id !== task?.id) // Exclude current task
+                            .map(t => (
+                              <option key={t.id} value={t.id}>
+                                {t.process}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveLinkedIssue(index)}
+                      className="mt-5 text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
+                      title="Remove link"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 italic">No linked issues. Click "Add Link" to create a relationship.</p>
+            )}
           </div>
 
           {/* Action Buttons */}

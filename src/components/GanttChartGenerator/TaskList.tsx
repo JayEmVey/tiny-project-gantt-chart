@@ -8,9 +8,11 @@ interface TaskListProps {
   userStories: UserStory[];
   onAddTask: () => void;
   onTaskClick: (task: Task) => void;
-  onTaskReorder: (fromIndex: number, toIndex: number) => void;
+  onTaskScrollTo?: (task: Task) => void;
   onEpicToggle: (epicId: number) => void;
+  onEpicScrollTo?: (epic: Epic) => void;
   onUserStoryToggle: (userStoryId: number) => void;
+  onUserStoryScrollTo?: (userStory: UserStory) => void;
   onAddEpic: () => void;
   onAddUserStory: (epicId: number) => void;
   onEpicClick?: (epic: Epic) => void;
@@ -18,6 +20,10 @@ interface TaskListProps {
   onToggleCollapse?: () => void;
   onCloneEpic?: (epicId: number) => void;
   onDeleteEpic?: (epicId: number) => void;
+  onToggleAllEpics?: (selectAll: boolean) => void;
+  onEpicReorder?: (epicId: number, targetEpicId: number) => void;
+  onUserStoryReorder?: (userStoryId: number, targetUserStoryId: number) => void;
+  onTaskReorder?: (taskId: number, targetTaskId: number) => void;
 }
 
 const TaskList: React.FC<TaskListProps> = ({
@@ -26,24 +32,36 @@ const TaskList: React.FC<TaskListProps> = ({
   userStories,
   onAddTask,
   onTaskClick,
-  onTaskReorder,
+  onTaskScrollTo,
   onEpicToggle,
+  onEpicScrollTo,
   onUserStoryToggle,
+  onUserStoryScrollTo,
   onAddEpic,
   onAddUserStory,
   onEpicClick,
   onUserStoryClick,
   onToggleCollapse,
   onCloneEpic,
-  onDeleteEpic
+  onDeleteEpic,
+  onToggleAllEpics,
+  onEpicReorder,
+  onUserStoryReorder,
+  onTaskReorder
 }) => {
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set());
   const [expandedUserStories, setExpandedUserStories] = useState<Set<number>>(new Set());
-  const [draggedTaskIndex, setDraggedTaskIndex] = useState<number | null>(null);
-  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [isAllExpanded, setIsAllExpanded] = useState(false);
   const addMenuRef = useRef<HTMLDivElement>(null);
+
+  // Drag and drop state
+  const [draggedEpicId, setDraggedEpicId] = useState<number | null>(null);
+  const [draggedUserStoryId, setDraggedUserStoryId] = useState<number | null>(null);
+  const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+  const [dragOverEpicId, setDragOverEpicId] = useState<number | null>(null);
+  const [dragOverUserStoryId, setDragOverUserStoryId] = useState<number | null>(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState<number | null>(null);
 
   // Get selected epics
   const selectedEpics = epics.filter(epic => epic.isSelected);
@@ -92,21 +110,26 @@ const TaskList: React.FC<TaskListProps> = ({
   };
 
   const handleCheckUncheckAll = () => {
-    // Toggle all epics
-    if (allEpicsSelected) {
-      // Uncheck all
-      epics.forEach(epic => {
-        if (epic.isSelected) {
-          onEpicToggle(epic.id);
-        }
-      });
+    // Use the bulk toggle if available, otherwise fall back to individual toggles
+    if (onToggleAllEpics) {
+      onToggleAllEpics(!allEpicsSelected);
     } else {
-      // Check all
-      epics.forEach(epic => {
-        if (!epic.isSelected) {
-          onEpicToggle(epic.id);
-        }
-      });
+      // Fallback: Toggle all epics individually
+      if (allEpicsSelected) {
+        // Uncheck all
+        epics.forEach(epic => {
+          if (epic.isSelected) {
+            onEpicToggle(epic.id);
+          }
+        });
+      } else {
+        // Check all
+        epics.forEach(epic => {
+          if (!epic.isSelected) {
+            onEpicToggle(epic.id);
+          }
+        });
+      }
     }
   };
 
@@ -141,41 +164,127 @@ const TaskList: React.FC<TaskListProps> = ({
     return tasks.filter(task => task.userStoryId === userStoryId);
   };
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    setDraggedTaskIndex(index);
-    setIsDragging(true);
+  // Placeholder for future handlers if needed
+
+  const handleToggleAll = () => {
+    if (isAllExpanded) {
+      // Collapse all
+      setExpandedEpics(new Set());
+      setExpandedUserStories(new Set());
+    } else {
+      // Expand all
+      const allEpics = new Set(epics.map(epic => epic.id));
+      const allUserStories = new Set(userStories.map(story => story.id));
+      setExpandedEpics(allEpics);
+      setExpandedUserStories(allUserStories);
+    }
+    setIsAllExpanded(!isAllExpanded);
+  };
+
+  // Drag handlers for Epics
+  const handleEpicDragStart = (e: React.DragEvent, epicId: number) => {
+    setDraggedEpicId(epicId);
     e.dataTransfer.effectAllowed = 'move';
-    // Add slight transparency to the dragged element
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '0.5';
-    }
+    e.dataTransfer.setData('text/plain', epicId.toString());
   };
 
-  const handleDragEnd = (e: React.DragEvent) => {
-    if (e.currentTarget instanceof HTMLElement) {
-      e.currentTarget.style.opacity = '1';
-    }
-
-    // Perform the reorder
-    if (draggedTaskIndex !== null && dropTargetIndex !== null && draggedTaskIndex !== dropTargetIndex) {
-      onTaskReorder(draggedTaskIndex, dropTargetIndex);
-    }
-
-    setDraggedTaskIndex(null);
-    setDropTargetIndex(null);
-    setIsDragging(false);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleEpicDragOver = (e: React.DragEvent, epicId: number) => {
     e.preventDefault();
-    if (draggedTaskIndex === null) return;
-
-    setDropTargetIndex(index);
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverEpicId(epicId);
   };
 
-  const handleDragLeave = () => {
-    // Only clear if we're actually leaving the list
-    setDropTargetIndex(null);
+  const handleEpicDragLeave = () => {
+    setDragOverEpicId(null);
+  };
+
+  const handleEpicDrop = (e: React.DragEvent, targetEpicId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (draggedEpicId !== null && draggedEpicId !== targetEpicId && onEpicReorder) {
+      onEpicReorder(draggedEpicId, targetEpicId);
+    }
+
+    setDraggedEpicId(null);
+    setDragOverEpicId(null);
+  };
+
+  const handleEpicDragEnd = () => {
+    setDraggedEpicId(null);
+    setDragOverEpicId(null);
+  };
+
+  // Drag handlers for User Stories
+  const handleUserStoryDragStart = (e: React.DragEvent, userStoryId: number) => {
+    e.stopPropagation();
+    setDraggedUserStoryId(userStoryId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', userStoryId.toString());
+  };
+
+  const handleUserStoryDragOver = (e: React.DragEvent, userStoryId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverUserStoryId(userStoryId);
+  };
+
+  const handleUserStoryDragLeave = () => {
+    setDragOverUserStoryId(null);
+  };
+
+  const handleUserStoryDrop = (e: React.DragEvent, targetUserStoryId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (draggedUserStoryId !== null && draggedUserStoryId !== targetUserStoryId && onUserStoryReorder) {
+      onUserStoryReorder(draggedUserStoryId, targetUserStoryId);
+    }
+
+    setDraggedUserStoryId(null);
+    setDragOverUserStoryId(null);
+  };
+
+  const handleUserStoryDragEnd = () => {
+    setDraggedUserStoryId(null);
+    setDragOverUserStoryId(null);
+  };
+
+  // Drag handlers for Tasks
+  const handleTaskDragStart = (e: React.DragEvent, taskId: number) => {
+    e.stopPropagation();
+    setDraggedTaskId(taskId);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', taskId.toString());
+  };
+
+  const handleTaskDragOver = (e: React.DragEvent, taskId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverTaskId(taskId);
+  };
+
+  const handleTaskDragLeave = () => {
+    setDragOverTaskId(null);
+  };
+
+  const handleTaskDrop = (e: React.DragEvent, targetTaskId: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (draggedTaskId !== null && draggedTaskId !== targetTaskId && onTaskReorder) {
+      onTaskReorder(draggedTaskId, targetTaskId);
+    }
+
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+  };
+
+  const handleTaskDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
   };
 
   return (
@@ -185,6 +294,17 @@ const TaskList: React.FC<TaskListProps> = ({
         {/* Top Row: Add, Clone, Delete, Collapse */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleToggleAll}
+              className="flex items-center justify-center p-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
+              title={isAllExpanded ? "Collapse all" : "Expand all"}
+            >
+              {isAllExpanded ? (
+                <ChevronRight className="w-5 h-5" strokeWidth={2} />
+              ) : (
+                <ChevronDown className="w-5 h-5" strokeWidth={2} />
+              )}
+            </button>
             <button
               onClick={() => setShowAddMenu(!showAddMenu)}
               className="flex items-center justify-center p-2 border-2 border-gray-800 rounded-lg hover:bg-gray-50 transition-colors"
@@ -232,7 +352,7 @@ const TaskList: React.FC<TaskListProps> = ({
               type="checkbox"
               checked={allEpicsSelected}
               onChange={handleCheckUncheckAll}
-              className="w-4 h-4 border-2 border-gray-300 rounded cursor-pointer"
+              className="w-5 h-5 border-2 border-gray-300 rounded cursor-pointer"
             />
             <span className="text-sm text-gray-600">Check/Uncheck All</span>
           </div>
@@ -279,10 +399,23 @@ const TaskList: React.FC<TaskListProps> = ({
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-0">
           {epics.map((epic) => (
-            <div key={epic.id} className="border-b border-gray-200">
+            <div
+              key={epic.id}
+              className="border-b border-gray-200"
+            >
               {/* Epic Level */}
               <div
-                className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                draggable
+                onDragStart={(e) => handleEpicDragStart(e, epic.id)}
+                onDragOver={(e) => handleEpicDragOver(e, epic.id)}
+                onDragLeave={handleEpicDragLeave}
+                onDrop={(e) => handleEpicDrop(e, epic.id)}
+                onDragEnd={handleEpicDragEnd}
+                className={`flex items-center px-4 py-3 hover:bg-gray-50 cursor-move transition-colors ${
+                  draggedEpicId === epic.id ? 'opacity-50' : ''
+                } ${
+                  dragOverEpicId === epic.id && draggedEpicId !== epic.id ? 'border-t-2 border-blue-500' : ''
+                }`}
                 onClick={() => toggleEpic(epic.id)}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
@@ -314,8 +447,16 @@ const TaskList: React.FC<TaskListProps> = ({
                     <ChevronRight className="w-4 h-4" />
                   )}
                 </button>
-                <div className="ml-2 flex items-center gap-2">
-                  <div className="w-4 h-4 bg-pink-500 rounded flex-shrink-0" />
+                <div
+                  className="ml-2 flex items-center gap-2 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (onEpicScrollTo) {
+                      onEpicScrollTo(epic);
+                    }
+                  }}
+                >
+                  <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#9A4D99' }} />
                   <span className="font-bold text-gray-800">{epic.name}</span>
                 </div>
               </div>
@@ -327,14 +468,25 @@ const TaskList: React.FC<TaskListProps> = ({
                     <div key={userStory.id}>
                       {/* User Story Level */}
                       <div
-                        className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                        draggable
+                        onDragStart={(e) => handleUserStoryDragStart(e, userStory.id)}
+                        onDragOver={(e) => handleUserStoryDragOver(e, userStory.id)}
+                        onDragLeave={handleUserStoryDragLeave}
+                        onDrop={(e) => handleUserStoryDrop(e, userStory.id)}
+                        onDragEnd={handleUserStoryDragEnd}
+                        className={`flex items-center px-4 py-2 hover:bg-gray-50 cursor-move transition-colors ${
+                          draggedUserStoryId === userStory.id ? 'opacity-50' : ''
+                        } ${
+                          dragOverUserStoryId === userStory.id && draggedUserStoryId !== userStory.id ? 'border-t-2 border-blue-500' : ''
+                        }`}
                         onClick={() => toggleUserStory(userStory.id)}
                         onDoubleClick={(e) => {
                           e.stopPropagation();
                           if (onUserStoryClick) {
                             onUserStoryClick(userStory);
                           }
-                        }}
+                        }
+                        }
                       >
                         <input
                           type="checkbox"
@@ -359,12 +511,16 @@ const TaskList: React.FC<TaskListProps> = ({
                             <ChevronRight className="w-3 h-3" />
                           )}
                         </button>
-                        <div className="ml-2 flex items-center gap-2">
-                          <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center flex-shrink-0">
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
+                        <div
+                          className="ml-2 flex items-center gap-2 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onUserStoryScrollTo) {
+                              onUserStoryScrollTo(userStory);
+                            }
+                          }}
+                        >
+                          <div className="w-4 h-4 rounded flex-shrink-0" style={{ backgroundColor: '#00694C' }} />
                           <span className="font-medium text-gray-700">{userStory.name}</span>
                         </div>
                       </div>
@@ -375,11 +531,30 @@ const TaskList: React.FC<TaskListProps> = ({
                           {getTasksForUserStory(userStory.id).map((task) => (
                             <div
                               key={task.id}
-                              onClick={() => onTaskClick(task)}
-                              className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                              draggable
+                              onDragStart={(e) => handleTaskDragStart(e, task.id)}
+                              onDragOver={(e) => handleTaskDragOver(e, task.id)}
+                              onDragLeave={handleTaskDragLeave}
+                              onDrop={(e) => handleTaskDrop(e, task.id)}
+                              onDragEnd={handleTaskDragEnd}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onTaskScrollTo) {
+                                  onTaskScrollTo(task);
+                                }
+                              }}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                onTaskClick(task);
+                              }}
+                              className={`flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer transition-colors ${
+                                draggedTaskId === task.id ? 'opacity-50' : ''
+                              } ${
+                                dragOverTaskId === task.id && draggedTaskId !== task.id ? 'border-t-2 border-blue-500' : ''
+                              }`}
                             >
                               <div className="ml-6 flex items-center gap-2">
-                                <div className="w-3.5 h-3.5 bg-blue-600 rounded flex-shrink-0" />
+                                <div className="w-3.5 h-3.5 rounded flex-shrink-0" style={{ backgroundColor: '#0085CA' }} />
                                 <span className="text-sm text-gray-600">{task.process}</span>
                               </div>
                             </div>

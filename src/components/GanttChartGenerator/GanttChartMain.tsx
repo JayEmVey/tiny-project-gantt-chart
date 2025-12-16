@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Task, ZoomLevel, Epic, UserStory, Milestone } from '../../types';
+import { Task, ZoomLevel, Epic, UserStory, Milestone, ViewType } from '../../types';
 import Header from './Header';
 import TaskList from './TaskList';
 import TaskModal from './TaskModal';
@@ -9,7 +9,7 @@ import MilestoneModal from './MilestoneModal';
 import ExportModal, { ExportOptions } from './ExportModal';
 import ViewControls from './ViewControls';
 import GanttChartView from './GanttChartView';
-import { saveProjectToFile, openProjectFile } from '../../utils/projectFileHandler';
+import { saveProjectToFile, openProjectFile, saveProjectToLocalStorage, loadProjectFromLocalStorage, getLastSavedTimestamp } from '../../utils/projectFileHandler';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import './animations.css';
@@ -95,13 +95,63 @@ const GanttChartMain: React.FC = () => {
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
+  const [zoomScale, setZoomScale] = useState<number>(1.0); // 0.25 to 3.0
+  const [viewType, setViewType] = useState<ViewType>('task');
   const [showCriticalPath, setShowCriticalPath] = useState(false);
   const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
+  // Global font size option: larger | medium | smaller
+  const [fontSizeOption, setFontSizeOption] = useState<'larger' | 'medium' | 'smaller'>(() => {
+    const saved = localStorage.getItem('app-font-size-option');
+    if (saved === 'larger' || saved === 'medium' || saved === 'smaller') return saved;
+    return 'medium'; // default
+  });
+
+  // Apply font size to :root via CSS variable
+  useEffect(() => {
+    const root = document.documentElement;
+    // Larger = 14px, Medium = 12px (default), Smaller = 10px
+    const sizePx = fontSizeOption === 'larger' ? '14px' : fontSizeOption === 'smaller' ? '10px' : '12px';
+    root.style.setProperty('--app-font-size', sizePx);
+    localStorage.setItem('app-font-size-option', fontSizeOption);
+  }, [fontSizeOption]);
 
   const chartRef = useRef<HTMLDivElement>(null);
   const ganttScrollRef = useRef<HTMLDivElement>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSavedState, setLastSavedState] = useState<string>('');
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(() => {
+    const saved = localStorage.getItem('app-autosave-enabled');
+    return saved === 'true';
+  });
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load project from localStorage on mount if available
+  useEffect(() => {
+    const savedProject = loadProjectFromLocalStorage();
+    if (savedProject) {
+      setProjectName(savedProject.projectName);
+      setEpics(savedProject.epics);
+      setUserStories(savedProject.userStories);
+      setTasks(savedProject.tasks);
+      setMilestones(savedProject.milestones || []);
+
+      // Update saved state
+      const currentState = JSON.stringify({
+        projectName: savedProject.projectName,
+        epics: savedProject.epics,
+        userStories: savedProject.userStories,
+        tasks: savedProject.tasks,
+        milestones: savedProject.milestones || []
+      });
+      setLastSavedState(currentState);
+      setHasUnsavedChanges(false);
+    }
+
+    // Load last saved timestamp
+    const timestamp = getLastSavedTimestamp();
+    setLastSavedTime(timestamp);
+  }, []);
 
   // Navigate to current day on mount
   useEffect(() => {
@@ -119,19 +169,17 @@ const GanttChartMain: React.FC = () => {
         todayIndex = Math.floor((today.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
       } else if (zoomLevel === 'month') {
         todayIndex = today.getMonth();
-      } else if (zoomLevel === 'quarter') {
-        todayIndex = Math.floor(today.getMonth() / 3);
       }
 
       // Calculate scroll position to center today
-      const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4;
+      const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : 12;
       const scrollAmount = (todayIndex / totalColumns) * ganttScrollRef.current.scrollWidth;
       ganttScrollRef.current.scrollTo({ left: scrollAmount - ganttScrollRef.current.clientWidth / 2, behavior: 'smooth' });
     }, 500);
     return () => clearTimeout(timer);
   }, []); // Empty dependency array means this runs once on mount
 
-  // Track changes to project data
+  // Track changes to project data and trigger auto-save
   useEffect(() => {
     const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
     if (lastSavedState === '') {
@@ -139,15 +187,44 @@ const GanttChartMain: React.FC = () => {
       setLastSavedState(currentState);
     } else if (currentState !== lastSavedState) {
       setHasUnsavedChanges(true);
-    }
-  }, [projectName, epics, userStories, tasks, milestones, lastSavedState]);
 
-  // Add keyboard shortcut for save (Ctrl+S / Cmd+S)
+      // Trigger auto-save after idle period (3 seconds)
+      if (autoSaveEnabled) {
+        // Clear existing timer
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+
+        // Set new timer for auto-save after 3 seconds of inactivity
+        autoSaveTimerRef.current = setTimeout(() => {
+          handleSaveToCloud();
+        }, 3000);
+      }
+    }
+
+    // Cleanup timer on unmount
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [projectName, epics, userStories, tasks, milestones, lastSavedState, autoSaveEnabled]);
+
+  // Add keyboard shortcuts for save (Ctrl+S / Cmd+S) and zoom (Ctrl/Cmd + Plus/Minus/0)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         handleSaveProject();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '=' || e.key === '+')) {
+        e.preventDefault();
+        handleZoomIn();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        handleZoomOut();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        handleResetZoom();
       }
     };
 
@@ -155,30 +232,38 @@ const GanttChartMain: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [projectName, epics, userStories, tasks, milestones]);
 
-  // Filter tasks based on selected epics and user stories
-  const getFilteredTasks = () => {
-    return tasks.filter(task => {
-      // Find the epic for this task
-      const epic = epics.find(e => e.id === task.epicId);
-      if (!epic || !epic.isSelected) return false;
+  // (optional) Filtering helpers for epics/user stories removed as unused in current UI
 
-      // Find the user story for this task
-      const userStory = userStories.find(us => us.id === task.userStoryId);
-      if (!userStory || !userStory.isSelected) return false;
+  // const filteredTasks = getFilteredTasks(); // computed on-demand where needed
 
-      return true;
-    });
+  // Handle AutoSave toggle
+  const handleAutoSaveToggle = (enabled: boolean) => {
+    setAutoSaveEnabled(enabled);
+    localStorage.setItem('app-autosave-enabled', enabled.toString());
   };
-
-  const filteredTasks = getFilteredTasks();
 
   // Handle New Project
   const handleNewProject = () => {
+    // Check if there are unsaved changes
+    if (hasUnsavedChanges) {
+      const confirmSave = window.confirm(
+        'You have unsaved changes. Do you want to save to cloud before creating a new project?'
+      );
+
+      if (confirmSave) {
+        handleSaveToCloud();
+      }
+    }
+
     const confirmNew = window.confirm(
-      'Are you sure you want to create a new project? Any unsaved changes will be lost.'
+      'Are you sure you want to create a new project? The current cloud project will be cleared.'
     );
 
     if (confirmNew) {
+      // Clear localStorage cloud project
+      localStorage.removeItem('tgc-cloud-project');
+      localStorage.removeItem('tgc-cloud-project-last-saved');
+
       // Reset to completely empty state
       setProjectName('New Project');
       setEpics([]);
@@ -188,6 +273,9 @@ const GanttChartMain: React.FC = () => {
       setZoomLevel('day');
       setShowCriticalPath(false);
       setIsTaskListCollapsed(false);
+      setLastSavedState('');
+      setHasUnsavedChanges(false);
+      setLastSavedTime(null);
 
       alert('New project created successfully!');
     }
@@ -195,22 +283,99 @@ const GanttChartMain: React.FC = () => {
 
   // Handle Save Project
   const handleSaveProject = () => {
+    // Check if the project name is still "Untitled Project"
+    if (projectName === 'Untitled Project') {
+      const newProjectName = window.prompt(
+        'Please enter a name for your project before saving:',
+        projectName
+      );
+
+      // If user cancels or provides empty name, don't save
+      if (!newProjectName || newProjectName.trim() === '') {
+        alert('Project save cancelled. Please provide a valid project name.');
+        return;
+      }
+
+      // Update the project name before saving
+      setProjectName(newProjectName.trim());
+
+      // Save with the new name
+      try {
+        saveProjectToFile(newProjectName.trim(), epics, userStories, tasks, milestones);
+        const currentState = JSON.stringify({ projectName: newProjectName.trim(), epics, userStories, tasks, milestones });
+        setLastSavedState(currentState);
+        setHasUnsavedChanges(false);
+        alert('Project saved successfully!');
+      } catch (error) {
+        console.error('Failed to save project:', error);
+        alert('Failed to save project. Please try again.');
+      }
+    } else {
+      // Project already has a name, proceed with save
+      try {
+        saveProjectToFile(projectName, epics, userStories, tasks, milestones);
+        const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
+        setLastSavedState(currentState);
+        setHasUnsavedChanges(false);
+        alert('Project saved successfully!');
+      } catch (error) {
+        console.error('Failed to save project:', error);
+        alert('Failed to save project. Please try again.');
+      }
+    }
+  };
+
+  // Handle Save to Cloud (localStorage)
+  const handleSaveToCloud = (showAlert: boolean = false) => {
     try {
-      saveProjectToFile(projectName, epics, userStories, tasks, milestones);
+      saveProjectToLocalStorage(projectName, epics, userStories, tasks, milestones);
       const currentState = JSON.stringify({ projectName, epics, userStories, tasks, milestones });
       setLastSavedState(currentState);
       setHasUnsavedChanges(false);
-      alert('Project saved successfully!');
+
+      // Update last saved timestamp
+      const timestamp = getLastSavedTimestamp();
+      setLastSavedTime(timestamp);
+
+      // Only show alert if explicitly requested (manual save)
+      if (showAlert) {
+        alert('Project saved to cloud successfully!');
+      }
     } catch (error) {
-      console.error('Failed to save project:', error);
-      alert('Failed to save project. Please try again.');
+      console.error('Failed to save project to cloud:', error);
+      if (showAlert) {
+        alert('Failed to save project to cloud. Please try again.');
+      }
     }
   };
 
   // Handle Open Project
   const handleOpenProject = async () => {
+    // Check if there are unsaved changes
+    if (hasUnsavedChanges) {
+      const confirmSave = window.confirm(
+        'You have unsaved changes. Do you want to save to cloud before opening a project?'
+      );
+
+      if (confirmSave) {
+        handleSaveToCloud();
+      }
+    }
+
+    const confirmOpen = window.confirm(
+      'Opening a project will clear the current cloud project. Continue?'
+    );
+
+    if (!confirmOpen) {
+      return;
+    }
+
     try {
       const projectData = await openProjectFile();
+
+      // Clear localStorage cloud project
+      localStorage.removeItem('tgc-cloud-project');
+      localStorage.removeItem('tgc-cloud-project-last-saved');
 
       // Update state with loaded data
       setProjectName(projectData.projectName);
@@ -229,6 +394,7 @@ const GanttChartMain: React.FC = () => {
       });
       setLastSavedState(currentState);
       setHasUnsavedChanges(false);
+      setLastSavedTime(null);
 
       alert('Project loaded successfully!');
     } catch (error) {
@@ -245,14 +411,110 @@ const GanttChartMain: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  // Handle scrolling to a task's position in the timeline
+  const handleScrollToTask = (task: Task) => {
+    if (!ganttScrollRef.current || !task.startDate) return;
+
+    // Parse the task's start date (format: DD/MM/YYYY)
+    const [day, month, year] = task.startDate.split('/').map(Number);
+    const taskStartDate = new Date(year, month - 1, day);
+    const yearStart = new Date(taskStartDate.getFullYear(), 0, 1);
+
+    let taskIndex = 0;
+
+    // Calculate the index based on zoom level
+    if (zoomLevel === 'day') {
+      taskIndex = Math.floor((taskStartDate.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+    } else if (zoomLevel === 'week') {
+      taskIndex = Math.floor((taskStartDate.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 7));
+    } else if (zoomLevel === 'month') {
+      taskIndex = taskStartDate.getMonth();
+    } else if (zoomLevel === 'quarter') {
+      taskIndex = Math.floor(taskStartDate.getMonth() / 3);
+    }
+
+    // Calculate total columns based on zoom level
+    const totalColumns = zoomLevel === 'day' ? 365 : zoomLevel === 'week' ? 52 : zoomLevel === 'month' ? 12 : 4;
+
+    // Calculate scroll position to show the task (center it in view)
+    const scrollAmount = (taskIndex / totalColumns) * ganttScrollRef.current.scrollWidth;
+    ganttScrollRef.current.scrollTo({
+      left: scrollAmount - ganttScrollRef.current.clientWidth / 2,
+      behavior: 'smooth'
+    });
+  };
+
+  // Handle scrolling to a user story's position (finds earliest task)
+  const handleScrollToUserStory = (userStory: UserStory) => {
+    if (!ganttScrollRef.current) return;
+
+    // Find all tasks belonging to this user story
+    const userStoryTasks = tasks.filter(t => t.userStoryId === userStory.id);
+
+    if (userStoryTasks.length === 0) return;
+
+    // Find the earliest task
+    const earliestTask = userStoryTasks.reduce((earliest, current) => {
+      if (!current.startDate) return earliest;
+      if (!earliest || !earliest.startDate) return current;
+
+      const [dayC, monthC, yearC] = current.startDate.split('/').map(Number);
+      const [dayE, monthE, yearE] = earliest.startDate.split('/').map(Number);
+      const currentDate = new Date(yearC, monthC - 1, dayC);
+      const earliestDate = new Date(yearE, monthE - 1, dayE);
+
+      return currentDate < earliestDate ? current : earliest;
+    });
+
+    // Scroll to the earliest task
+    if (earliestTask) {
+      handleScrollToTask(earliestTask);
+    }
+  };
+
+  // Handle scrolling to an epic's position (finds earliest task)
+  const handleScrollToEpic = (epic: Epic) => {
+    if (!ganttScrollRef.current) return;
+
+    // Find all tasks belonging to this epic
+    const epicTasks = tasks.filter(t => t.epicId === epic.id);
+
+    if (epicTasks.length === 0) return;
+
+    // Find the earliest task
+    const earliestTask = epicTasks.reduce((earliest, current) => {
+      if (!current.startDate) return earliest;
+      if (!earliest || !earliest.startDate) return current;
+
+      const [dayC, monthC, yearC] = current.startDate.split('/').map(Number);
+      const [dayE, monthE, yearE] = earliest.startDate.split('/').map(Number);
+      const currentDate = new Date(yearC, monthC - 1, dayC);
+      const earliestDate = new Date(yearE, monthE - 1, dayE);
+
+      return currentDate < earliestDate ? current : earliest;
+    });
+
+    // Scroll to the earliest task
+    if (earliestTask) {
+      handleScrollToTask(earliestTask);
+    }
+  };
+
   // Handle clicking on a task (either from list or chart)
   const handleTaskClick = (task: Task) => {
+    // Close all other modals first
+    setIsEpicModalOpen(false);
+    setIsUserStoryModalOpen(false);
+    setIsMilestoneModalOpen(false);
+    setIsExportModalOpen(false);
+
+    // Open task modal
     setEditingTask(task);
     setIsModalOpen(true);
   };
 
   // Handle clicking on an empty cell in the chart
-  const handleEmptyCellClick = (date: Date, taskIndex?: number) => {
+  const handleEmptyCellClick = (date: Date, _taskIndex?: number) => {
     const formatDate = (d: Date): string => {
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -295,14 +557,6 @@ const GanttChartMain: React.FC = () => {
   // Handle deleting a task
   const handleDeleteTask = (taskId: number) => {
     setTasks(tasks.filter(t => t.id !== taskId));
-  };
-
-  // Handle reordering tasks via drag and drop in the task list
-  const handleTaskReorder = (fromIndex: number, toIndex: number) => {
-    const newTasks = [...tasks];
-    const [movedTask] = newTasks.splice(fromIndex, 1);
-    newTasks.splice(toIndex, 0, movedTask);
-    setTasks(newTasks);
   };
 
   // Handle task drag in chart (changing dates)
@@ -421,6 +675,21 @@ const GanttChartMain: React.FC = () => {
     ganttScrollRef.current.scrollBy({ left: ganttScrollRef.current.clientWidth * 0.5, behavior: 'smooth' });
   };
 
+  // Handle zoom in
+  const handleZoomIn = () => {
+    setZoomScale(prev => Math.min(3.0, prev + 0.1));
+  };
+
+  // Handle zoom out
+  const handleZoomOut = () => {
+    setZoomScale(prev => Math.max(0.25, prev - 0.1));
+  };
+
+  // Handle reset zoom
+  const handleResetZoom = () => {
+    setZoomScale(1.0);
+  };
+
   // Handle Epic toggle
   const handleEpicToggle = (epicId: number) => {
     const epic = epics.find(e => e.id === epicId);
@@ -437,6 +706,15 @@ const GanttChartMain: React.FC = () => {
     setUserStories(userStories.map(us =>
       us.epicId === epicId ? { ...us, isSelected: newSelectedState } : us
     ));
+  };
+
+  // Handle toggle all epics
+  const handleToggleAllEpics = (selectAll: boolean) => {
+    // Update all epics
+    setEpics(epics.map(e => ({ ...e, isSelected: selectAll })));
+
+    // Update all user stories to match
+    setUserStories(userStories.map(us => ({ ...us, isSelected: selectAll })));
   };
 
   // Handle User Story toggle
@@ -615,23 +893,91 @@ const GanttChartMain: React.FC = () => {
     setMilestones(milestones.filter(m => m.id !== milestoneId));
   };
 
+  // Handle Epic reorder
+  const handleEpicReorder = (epicId: number, targetEpicId: number) => {
+    const draggedIndex = epics.findIndex(e => e.id === epicId);
+    const targetIndex = epics.findIndex(e => e.id === targetEpicId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newEpics = [...epics];
+    const [draggedEpic] = newEpics.splice(draggedIndex, 1);
+    newEpics.splice(targetIndex, 0, draggedEpic);
+
+    setEpics(newEpics);
+  };
+
+  // Handle User Story reorder
+  const handleUserStoryReorder = (userStoryId: number, targetUserStoryId: number) => {
+    const draggedIndex = userStories.findIndex(us => us.id === userStoryId);
+    const targetIndex = userStories.findIndex(us => us.id === targetUserStoryId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Only allow reordering within the same epic
+    const draggedUserStory = userStories[draggedIndex];
+    const targetUserStory = userStories[targetIndex];
+
+    if (draggedUserStory.epicId !== targetUserStory.epicId) return;
+
+    const newUserStories = [...userStories];
+    const [draggedUS] = newUserStories.splice(draggedIndex, 1);
+    newUserStories.splice(targetIndex, 0, draggedUS);
+
+    setUserStories(newUserStories);
+  };
+
+  // Handle Task reorder
+  const handleTaskReorder = (taskId: number, targetTaskId: number) => {
+    const draggedIndex = tasks.findIndex(t => t.id === taskId);
+    const targetIndex = tasks.findIndex(t => t.id === targetTaskId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Only allow reordering within the same user story
+    const draggedTask = tasks[draggedIndex];
+    const targetTask = tasks[targetIndex];
+
+    if (draggedTask.userStoryId !== targetTask.userStoryId) return;
+
+    const newTasks = [...tasks];
+    const [draggedT] = newTasks.splice(draggedIndex, 1);
+    newTasks.splice(targetIndex, 0, draggedT);
+
+    setTasks(newTasks);
+  };
+
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Header */}
       <Header
         onExport={handleExportClick}
         onSaveProject={handleSaveProject}
+        onSaveToCloud={() => handleSaveToCloud(true)}
         onOpenProject={handleOpenProject}
         onNewProject={handleNewProject}
         projectName={projectName}
         onProjectNameChange={setProjectName}
         hasUnsavedChanges={hasUnsavedChanges}
+        lastSavedTime={lastSavedTime}
+        autoSaveEnabled={autoSaveEnabled}
+        onAutoSaveToggle={handleAutoSaveToggle}
+        fontSizeOption={fontSizeOption}
+        onFontSizeChange={setFontSizeOption}
+        viewType={viewType}
+        onViewTypeChange={setViewType}
       />
 
       {/* View Controls */}
       <ViewControls
         zoomLevel={zoomLevel}
         onZoomChange={setZoomLevel}
+        zoomScale={zoomScale}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onResetZoom={handleResetZoom}
+        viewType={viewType}
+        onViewTypeChange={setViewType}
         showCriticalPath={showCriticalPath}
         onToggleCriticalPath={setShowCriticalPath}
         onNavigateLeft={handleNavigateLeft}
@@ -649,9 +995,11 @@ const GanttChartMain: React.FC = () => {
             userStories={userStories}
             onAddTask={handleAddTask}
             onTaskClick={handleTaskClick}
-            onTaskReorder={handleTaskReorder}
+            onTaskScrollTo={handleScrollToTask}
             onEpicToggle={handleEpicToggle}
+            onEpicScrollTo={handleScrollToEpic}
             onUserStoryToggle={handleUserStoryToggle}
+            onUserStoryScrollTo={handleScrollToUserStory}
             onAddEpic={handleAddEpic}
             onAddUserStory={handleAddUserStory}
             onEpicClick={handleEditEpic}
@@ -659,6 +1007,10 @@ const GanttChartMain: React.FC = () => {
             onToggleCollapse={() => setIsTaskListCollapsed(true)}
             onCloneEpic={handleCloneEpic}
             onDeleteEpic={handleDeleteEpic}
+            onToggleAllEpics={handleToggleAllEpics}
+            onEpicReorder={handleEpicReorder}
+            onUserStoryReorder={handleUserStoryReorder}
+            onTaskReorder={handleTaskReorder}
           />
         )}
 
@@ -682,8 +1034,11 @@ const GanttChartMain: React.FC = () => {
           ref={ganttScrollRef}
           tasks={tasks}
           epics={epics}
+          userStories={userStories}
           milestones={milestones}
           zoomLevel={zoomLevel}
+          zoomScale={zoomScale}
+          viewType={viewType}
           onTaskClick={handleTaskClick}
           onEpicClick={handleEditEpic}
           onEmptyCellClick={handleEmptyCellClick}
@@ -692,7 +1047,6 @@ const GanttChartMain: React.FC = () => {
           onMilestoneClick={handleMilestoneClick}
           onMilestoneDragUpdate={handleMilestoneDragUpdate}
           showCriticalPath={showCriticalPath}
-          onTaskReorder={handleTaskReorder}
         />
       </div>
 
@@ -700,6 +1054,7 @@ const GanttChartMain: React.FC = () => {
       <TaskModal
         isOpen={isModalOpen}
         task={editingTask}
+        tasks={tasks}
         epics={epics}
         userStories={userStories}
         onClose={() => setIsModalOpen(false)}

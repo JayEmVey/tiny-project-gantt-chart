@@ -3,6 +3,11 @@ export interface TaskDependency {
   type: 'finish-to-start' | 'start-to-start' | 'finish-to-finish'
 }
 
+export interface LinkedIssue {
+  taskId: number
+  linkType: 'blocks' | 'is-blocked-by' | 'duplicates' | 'is-duplicated-by' | 'clones' | 'is-cloned-by' | 'relates-to'
+}
+
 export interface Epic {
   id: number
   name: string
@@ -31,15 +36,45 @@ export interface Task {
   process: string
   startDate: string // DD/MM/YYYY format
   endDate: string   // DD/MM/YYYY format
-  assignee?: string
-  status?: 'not-started' | 'in-progress' | 'completed' | 'overdue'
-  priority?: 'low' | 'medium' | 'high'
-  progress?: number // 0-100
   description?: string
-  dependencies?: number[] // IDs of tasks this depends on (for backward compatibility)
-  dependenciesV2?: TaskDependency[] // New format with dependency types
+  assignee?: string
+  /**
+   * Priority accepts both title-case and lowercase variants for backward compatibility,
+   * and will gracefully accept other string values coming from imports.
+   */
+  priority?:
+    | 'Low'
+    | 'Medium'
+    | 'High'
+    | 'Critical'
+    | 'low'
+    | 'medium'
+    | 'high'
+    | 'critical'
+    | (string & {})
+  /**
+   * Status accepts both spaced and kebab-case variants, plus 'overdue',
+   * and will gracefully accept other string values coming from imports.
+   */
+  status?:
+    | 'Not Started'
+    | 'In Progress'
+    | 'Completed'
+    | 'On Hold'
+    | 'not-started'
+    | 'in-progress'
+    | 'completed'
+    | 'overdue'
+    | (string & {})
+  progress?: number // 0-100 percentage
+  dependencies?: number[] // Array of task IDs this task depends on
+  /** Optional relations for grouping in lists and views */
   epicId?: number
   userStoryId?: number
+  /** Rich dependency model (optional, used by some UIs) */
+  dependenciesV2?: TaskDependency[]
+  /** Optional linked issue metadata used in TaskModal */
+  linkedIssues?: LinkedIssue[]
 }
 
 // Alias for backward compatibility
@@ -70,6 +105,11 @@ export interface BarPosition {
 }
 
 export type ZoomLevel = 'day' | 'week' | 'month' | 'quarter'
+
+export type ViewType = 'task' | 'user-story' | 'epic'
+
+// Zoom scale factor (0.25x to 3.0x)
+export type ZoomScale = number
 
 export interface Dependency {
   fromTaskId: number
