@@ -50,60 +50,68 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
     const columns = [];
     const today = new Date();
     const startDate = new Date(today.getFullYear(), 0, 1); // Start of year
+    const endDate = new Date(2026, 11, 31); // December 31, 2026
 
     if (zoomLevel === 'week') {
-      // Generate 52 weeks
-      for (let i = 0; i < 52; i++) {
-        const weekStart = new Date(startDate);
-        weekStart.setDate(startDate.getDate() + i * 7);
+      // Generate weeks from start to end date
+      let currentDate = new Date(startDate);
+      let weekCount = 0;
+      while (currentDate <= endDate) {
         columns.push({
-          label: `W${i + 1}`,
-          date: weekStart,
+          label: `W${weekCount + 1}`,
+          date: new Date(currentDate),
           type: 'week',
-          month: weekStart.getMonth(),
-          monthName: weekStart.toLocaleDateString('en-US', { month: 'short' }),
-          quarter: Math.floor(weekStart.getMonth() / 3)
+          month: currentDate.getMonth(),
+          monthName: currentDate.toLocaleDateString('en-US', { month: 'short' }),
+          quarter: Math.floor(currentDate.getMonth() / 3)
         });
+        currentDate.setDate(currentDate.getDate() + 7);
+        weekCount++;
       }
     } else if (zoomLevel === 'month') {
-      // Generate 12 months
-      for (let i = 0; i < 12; i++) {
+      // Generate months from start to end date
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
         columns.push({
-          label: new Date(today.getFullYear(), i, 1).toLocaleDateString('en-US', { month: 'short' }),
-          date: new Date(today.getFullYear(), i, 1),
+          label: currentDate.toLocaleDateString('en-US', { month: 'short' }),
+          date: new Date(currentDate),
           type: 'month',
-          month: i,
-          monthName: new Date(today.getFullYear(), i, 1).toLocaleDateString('en-US', { month: 'short' })
+          month: currentDate.getMonth(),
+          monthName: currentDate.toLocaleDateString('en-US', { month: 'short' })
         });
+        currentDate.setMonth(currentDate.getMonth() + 1);
       }
     } else if (zoomLevel === 'quarter') {
-      // Generate 4 quarters
-      for (let i = 0; i < 4; i++) {
+      // Generate quarters from start to end date
+      let currentDate = new Date(startDate.getFullYear(), 0, 1);
+      while (currentDate <= endDate) {
+        const quarterNum = Math.floor(currentDate.getMonth() / 3);
         columns.push({
-          label: `Q${i + 1}`,
-          date: new Date(today.getFullYear(), i * 3, 1),
+          label: `Q${quarterNum + 1}`,
+          date: new Date(currentDate),
           type: 'quarter',
-          month: i * 3,
+          month: currentDate.getMonth(),
           monthName: ''
         });
+        currentDate.setMonth(currentDate.getMonth() + 3);
       }
     } else {
-      // Generate days (showing 365 days)
-      for (let i = 0; i < 365; i++) {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + i);
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
-        const isSaturday = date.getDay() === 6;
-        const isSunday = date.getDay() === 0;
+      // Generate days from start to end date
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const dayOfWeek = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+        const isSaturday = currentDate.getDay() === 6;
+        const isSunday = currentDate.getDay() === 0;
         columns.push({
-          label: date.getDate().toString(),
-          date: date,
+          label: currentDate.getDate().toString(),
+          date: new Date(currentDate),
           type: 'day',
-          month: date.getMonth(),
-          monthName: date.toLocaleDateString('en-US', { month: 'long' }),
+          month: currentDate.getMonth(),
+          monthName: currentDate.toLocaleDateString('en-US', { month: 'long' }),
           dayOfWeek: dayOfWeek,
           isWeekend: isSaturday || isSunday
         });
+        currentDate.setDate(currentDate.getDate() + 1);
       }
     }
 
@@ -675,12 +683,14 @@ const GanttChartView = forwardRef<HTMLDivElement, GanttChartViewProps>(({
                 <th className="sticky left-0 z-20 bg-white border-2 border-gray-800 p-3 font-bold text-gray-800 w-64">
                   {/* Empty cell for task names column */}
                 </th>
-                <th
-                  colSpan={timeColumns.length}
-                  className="bg-gray-200 border-2 border-gray-800 p-3 text-center font-bold text-gray-800"
-                >
-                  {zoomLevel === 'quarter' ? `Q1 ${new Date().getFullYear()}` : new Date().getFullYear()}
-                </th>
+                {timeColumns.length > 0 && (
+                  <th
+                    colSpan={timeColumns.length}
+                    className="bg-gray-200 border-2 border-gray-800 p-3 text-center font-bold text-gray-800"
+                  >
+                    {timeColumns[0]?.date.getFullYear()} - {timeColumns[timeColumns.length - 1]?.date.getFullYear()}
+                  </th>
+                )}
               </tr>
             )}
 
